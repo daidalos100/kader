@@ -122,6 +122,7 @@ button { color: inherit; }
 .goal-box-bottom { bottom: 0; border-bottom: 0; }
 .pitch-label { position: absolute; z-index: 2; left: 14px; color: rgba(244,243,239,.52); font-size: .61rem; font-weight: 800; letter-spacing: .24em; writing-mode: vertical-rl; }
 .pitch-label.top { top: 38px; }
+.pitch-label.middle { top: 50%; transform: translateY(-50%); }
 .pitch-label.bottom { bottom: 38px; transform: rotate(180deg); }
 
 .position-node {
