@@ -348,6 +348,7 @@ export default function SquadPlanner() {
             <button
               className={`position-node${players.length ? " has-players" : ""}`}
               key={position.id}
+              data-position={position.id}
               style={{ left: `${position.x}%`, top: `${position.y}%` }}
               type="button"
               onClick={() => openPosition(position)}
