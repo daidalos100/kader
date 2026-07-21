@@ -251,6 +251,83 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
   .row-actions button:not(.delete-player) { display: none; }
 }
 
+
+
+@media (max-width: 620px) {
+  html, body { overflow-x: hidden; }
+
+  .site-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+  }
+  .brand-lockup { min-width: 0; }
+  .brand-lockup > div { min-width: 0; }
+  .brand-lockup h1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .claim-image {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: center;
+    width: 132px;
+  }
+  .logout-button { grid-column: 2; grid-row: 1; }
+
+  .planner-intro h2 { font-size: clamp(2rem, 10.5vw, 2.45rem); }
+  .stats span { white-space: normal; line-height: 1.25; }
+
+  .pitch-wrap { min-height: 760px; }
+  .position-node { width: 78px; min-height: 74px; }
+  .position-node[data-position="lf"] { left: 14% !important; }
+  .position-node[data-position="rf"] { left: 86% !important; }
+  .position-node[data-position="lv"] { left: 20% !important; }
+  .position-node[data-position="rv"] { left: 80% !important; }
+  .position-badge { width: 42px; height: 42px; }
+  .position-names { gap: 2px; margin-top: 4px; }
+  .position-player {
+    width: 78px;
+    max-width: 78px;
+    justify-content: flex-start;
+    gap: 3px;
+  }
+  .position-player .player-avatar { width: 24px; height: 24px; }
+  .position-names strong { max-width: 50px; font-size: .64rem; }
+
+  footer { gap: 10px; }
+  footer span { white-space: nowrap; }
+
+  .position-dialog { overflow-y: auto; }
+  .dialog-panel { min-width: 0; }
+  .player-row {
+    grid-template-columns: 26px 30px 36px minmax(0, 1fr) 34px;
+    min-width: 0;
+    padding: 7px 6px;
+  }
+  .player-row .player-avatar { width: 32px; height: 32px; }
+  .player-row strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-actions { min-width: 0; }
+  .add-player-form > div { grid-template-columns: minmax(0, 1fr) auto; }
+  .add-player-form button { padding-inline: 14px; }
+}
+
+@media (max-width: 380px) {
+  .app-shell { padding-inline: 8px; }
+  .site-header { padding-inline: 2px; }
+  .claim-image { width: 116px; }
+  .planner-intro { padding-inline: 2px; }
+  .planner-intro h2 { font-size: 2rem; }
+  .stats > div { padding-inline: 10px; }
+  .pitch-wrap { min-height: 780px; }
+  .position-node[data-position="lf"] { left: 15% !important; }
+  .position-node[data-position="rf"] { left: 85% !important; }
+  .position-node[data-position="lv"] { left: 21% !important; }
+  .position-node[data-position="rv"] { left: 79% !important; }
+  .position-dialog { width: calc(100% - 10px); }
+  .dialog-panel { padding-inline: 15px; }
+  .add-player-form > div { grid-template-columns: 1fr; gap: 8px; }
+  .add-player-form input { border-right: 1px solid rgba(244,243,239,.22); }
+  .add-player-form button { min-height: 46px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
