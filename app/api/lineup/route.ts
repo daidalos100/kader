@@ -1,22 +1,22 @@
 export const dynamic = "force-dynamic";
 
+import { isAuthenticated } from "../../auth";
+
 type Player = { id: string; firstName: string };
 type RuntimeEnv = {
   SUPABASE_URL?: string;
   SUPABASE_SECRET_KEY?: string;
   SUPABASE_PUBLISHABLE_KEY?: string;
-  EDIT_PIN?: string;
 };
 
 const positionIds = new Set(["st", "lf", "rf", "zm", "zdm", "lv", "iv", "rv", "tw"]);
 
 async function config() {
   const nodeRuntime = process.env as RuntimeEnv;
-  if (nodeRuntime.SUPABASE_URL || nodeRuntime.SUPABASE_SECRET_KEY || nodeRuntime.SUPABASE_PUBLISHABLE_KEY || nodeRuntime.EDIT_PIN) {
+  if (nodeRuntime.SUPABASE_URL || nodeRuntime.SUPABASE_SECRET_KEY || nodeRuntime.SUPABASE_PUBLISHABLE_KEY) {
     return {
       url: nodeRuntime.SUPABASE_URL?.replace(/\/$/, ""),
       key: nodeRuntime.SUPABASE_SECRET_KEY ?? nodeRuntime.SUPABASE_PUBLISHABLE_KEY,
-      editPin: nodeRuntime.EDIT_PIN,
     };
   }
 
@@ -24,24 +24,7 @@ async function config() {
   const runtime = cloudflare.env as unknown as RuntimeEnv;
   const url = runtime.SUPABASE_URL?.replace(/\/$/, "");
   const key = runtime.SUPABASE_SECRET_KEY ?? runtime.SUPABASE_PUBLISHABLE_KEY;
-  return { url, key, editPin: runtime.EDIT_PIN };
-}
-
-async function pinMatches(request: Request, expected?: string) {
-  const provided = request.headers.get("x-edit-pin") ?? "";
-  if (!expected || !provided) return false;
-  const encoder = new TextEncoder();
-  const [providedHash, expectedHash] = await Promise.all([
-    crypto.subtle.digest("SHA-256", encoder.encode(provided)),
-    crypto.subtle.digest("SHA-256", encoder.encode(expected)),
-  ]);
-  const left = new Uint8Array(providedHash);
-  const right = new Uint8Array(expectedHash);
-  let difference = left.length ^ right.length;
-  for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
-    difference |= left[index] ^ right[index];
-  }
-  return difference === 0;
+  return { url, key };
 }
 
 function headers(key: string, extra?: Record<string, string>) {
@@ -68,6 +51,9 @@ function validPlayers(value: unknown): value is Player[] {
 }
 
 export async function GET() {
+  if (!(await isAuthenticated())) {
+    return Response.json({ error: "Nicht angemeldet." }, { status: 401 });
+  }
   const supabase = await config();
   if (!supabase.url || !supabase.key) {
     return Response.json({ lineup: {}, connected: false });
@@ -99,23 +85,14 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
-  const supabase = await config();
-  if (!(await pinMatches(request, supabase.editPin))) {
-    return Response.json({ error: "PIN ist nicht korrekt." }, { status: 401 });
-  }
-  return Response.json({ authorized: true });
-}
-
 export async function PATCH(request: Request) {
+  if (!(await isAuthenticated())) {
+    return Response.json({ error: "Nicht angemeldet." }, { status: 401 });
+  }
   const supabase = await config();
   if (!supabase.url || !supabase.key) {
     return Response.json({ connected: false });
   }
-  if (!(await pinMatches(request, supabase.editPin))) {
-    return Response.json({ error: "PIN ist nicht korrekt." }, { status: 401 });
-  }
-
   try {
     const payload = (await request.json()) as { positionId?: unknown; players?: unknown };
     if (typeof payload.positionId !== "string" || !positionIds.has(payload.positionId)) {
