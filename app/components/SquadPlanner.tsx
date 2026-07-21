@@ -387,7 +387,7 @@ export default function SquadPlanner() {
             <button className="close-dialog" type="button" onClick={closeDialog} aria-label="Fenster schließen">×</button>
             <p className="section-index">POSITION {activePosition.short}</p>
             <h3>{activePosition.label}</h3>
-            <p className="dialog-help">Die oberste Person ist die erste Besetzung. Am Griff ziehen, um die Reihenfolge zu ändern.</p>
+            <p className="dialog-help">Die Reihenfolge kann am Griff per Drag-and-drop angepasst werden.</p>
 
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={activePlayers.map((player) => player.id)} strategy={verticalListSortingStrategy}>
