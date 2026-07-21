@@ -34,7 +34,7 @@ export default function LoginPage() {
       <section className="login-card">
         <Image src="/brand/tsg-logo.png" alt="TSG Tübingen" width={110} height={110} priority unoptimized />
         <p className="section-index">GESCHÜTZTER BEREICH</p>
-        <h1>Kaderplaner</h1>
+        <h1>Kader D1</h1>
         <p>Bitte Bearbeitungs-PIN eingeben, um die Aufstellung zu öffnen.</p>
         <form onSubmit={login}>
           <label htmlFor="site-pin">PIN</label>
@@ -54,4 +54,3 @@ export default function LoginPage() {
     </main>
   );
 }
-
