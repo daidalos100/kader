@@ -43,7 +43,9 @@ export async function GET(request: Request) {
     `${url}/storage/v1/object/player-images/${encodeURIComponent(slug)}.webp`,
     { headers: storageHeaders(key), cache: "force-cache" },
   );
-  if (!response.ok) return new Response(null, { status: response.status === 404 ? 404 : 502 });
+  if (!response.ok) {
+    return new Response(null, { status: response.status === 400 || response.status === 404 ? 404 : 502 });
+  }
 
   return new Response(response.body, {
     headers: {
