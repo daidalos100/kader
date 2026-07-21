@@ -281,6 +281,8 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
   .position-node[data-position="rf"] { left: 86% !important; }
   .position-node[data-position="lv"] { left: 20% !important; }
   .position-node[data-position="rv"] { left: 80% !important; }
+  .position-node[data-position="zm"] { top: 40% !important; }
+  .position-node[data-position="zdm"] { top: 49% !important; }
   .position-badge { width: 42px; height: 42px; }
   .position-names { gap: 2px; margin-top: 4px; }
   .position-player {
