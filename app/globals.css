@@ -158,8 +158,8 @@ button { color: inherit; }
 .position-names { display: flex; flex-direction: column; align-items: center; gap: 3px; margin-top: 7px; text-align: center; }
 .position-player { display: flex; align-items: center; justify-content: center; gap: 5px; max-width: 118px; }
 .player-avatar { flex: 0 0 auto; border: 1px solid rgba(244,243,239,.7); border-radius: 50%; object-fit: cover; background: #0a0b0e; }
-.position-player .player-avatar { width: 25px; height: 25px; }
-.position-names strong { max-width: 84px; overflow: hidden; text-overflow: ellipsis; color: var(--white); font-size: .81rem; line-height: 1.12; white-space: nowrap; text-shadow: 0 2px 10px var(--black); }
+.position-player .player-avatar { width: 36px; height: 36px; }
+.position-names strong { max-width: 76px; overflow: hidden; text-overflow: ellipsis; color: var(--white); font-size: .81rem; line-height: 1.12; white-space: nowrap; text-shadow: 0 2px 10px var(--black); }
 .position-names em { color: rgba(244,243,239,.54); font-size: .64rem; font-style: normal; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
 
 footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color: #787a80; font-size: .61rem; font-weight: 800; letter-spacing: .18em; }
@@ -240,8 +240,8 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
   .position-badge { width: 46px; height: 46px; font-size: .68rem; }
   .position-names { margin-top: 5px; }
   .position-player { max-width: 92px; gap: 4px; }
-  .position-player .player-avatar { width: 21px; height: 21px; }
-  .position-names strong { max-width: 66px; font-size: .7rem; }
+  .position-player .player-avatar { width: 30px; height: 30px; }
+  .position-names strong { max-width: 58px; font-size: .7rem; }
   .position-names em { font-size: .55rem; }
   .pitch-label { display: none; }
   footer { padding: 18px 4px 0; }
