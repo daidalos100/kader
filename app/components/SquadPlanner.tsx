@@ -132,11 +132,7 @@ export default function SquadPlanner() {
   const [newName, setNewName] = useState("");
   const [saveState, setSaveState] = useState<SaveState>("loading");
   const [message, setMessage] = useState("");
-  const [editPin, setEditPin] = useState("");
-  const [isUnlocked, setIsUnlocked] = useState(false);
-  const [isUnlocking, setIsUnlocking] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const pinRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   const sensors = useSensors(
@@ -167,9 +163,9 @@ export default function SquadPlanner() {
   useEffect(() => {
     if (activePosition && dialogRef.current && !dialogRef.current.open) {
       dialogRef.current.showModal();
-      window.setTimeout(() => (isUnlocked ? inputRef.current : pinRef.current)?.focus(), 80);
+      window.setTimeout(() => inputRef.current?.focus(), 80);
     }
-  }, [activePosition, isUnlocked]);
+  }, [activePosition]);
 
   const activePlayers = activePosition ? lineup[activePosition.id] ?? [] : [];
   const occupiedPositions = useMemo(
@@ -194,15 +190,11 @@ export default function SquadPlanner() {
   }
 
   async function persist(positionId: string, players: Player[]) {
-    if (!isUnlocked || !editPin) {
-      setMessage("Bitte zuerst mit der Bearbeitungs-PIN freischalten.");
-      return;
-    }
     setSaveState("saving");
     try {
       const response = await fetch("/api/lineup", {
         method: "PATCH",
-        headers: { "content-type": "application/json", "x-edit-pin": editPin },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ positionId, players }),
       });
       const data = await response.json();
@@ -211,31 +203,6 @@ export default function SquadPlanner() {
     } catch {
       setSaveState("error");
       setMessage("Die Änderung ist sichtbar, konnte aber noch nicht gespeichert werden.");
-    }
-  }
-
-  async function unlockEditing(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!editPin.trim() || isUnlocking) return;
-    setIsUnlocking(true);
-    setMessage("");
-    try {
-      const response = await fetch("/api/lineup", {
-        method: "POST",
-        headers: { "x-edit-pin": editPin.trim() },
-      });
-      const data = await response.json();
-      if (!response.ok || !data.authorized) {
-        throw new Error(data.error ?? "PIN ist nicht korrekt.");
-      }
-      setEditPin(editPin.trim());
-      setIsUnlocked(true);
-      window.setTimeout(() => inputRef.current?.focus(), 80);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Freischaltung fehlgeschlagen.");
-      setIsUnlocked(false);
-    } finally {
-      setIsUnlocking(false);
     }
   }
 
@@ -290,6 +257,11 @@ export default function SquadPlanner() {
     }
   }
 
+  async function logout() {
+    await fetch("/api/auth", { method: "DELETE" });
+    window.location.assign("/login");
+  }
+
   return (
     <main className="app-shell">
       <header className="site-header">
@@ -309,6 +281,7 @@ export default function SquadPlanner() {
           priority
           unoptimized
         />
+        <button className="logout-button" type="button" onClick={logout}>Abmelden</button>
       </header>
 
       <section className="planner-intro" aria-labelledby="planner-heading">
@@ -388,33 +361,7 @@ export default function SquadPlanner() {
             <button className="close-dialog" type="button" onClick={closeDialog} aria-label="Fenster schließen">×</button>
             <p className="section-index">POSITION {activePosition.short}</p>
             <h3>{activePosition.label}</h3>
-            {!isUnlocked ? (
-              <div className="pin-gate">
-                <p className="dialog-help">Zum Ändern der Aufstellung bitte die Bearbeitungs-PIN eingeben.</p>
-                <form className="pin-form" onSubmit={unlockEditing}>
-                  <label htmlFor="edit-pin">Bearbeitungs-PIN</label>
-                  <div>
-                    <input
-                      ref={pinRef}
-                      id="edit-pin"
-                      value={editPin}
-                      onChange={(event) => setEditPin(event.target.value.replace(/\D/g, "").slice(0, 8))}
-                      inputMode="numeric"
-                      autoComplete="off"
-                      type="password"
-                      aria-describedby={message ? "pin-message" : undefined}
-                    />
-                    <button type="submit" disabled={!editPin.trim() || isUnlocking}>
-                      {isUnlocking ? "Prüft …" : "Freischalten"}
-                    </button>
-                  </div>
-                </form>
-                {message && <p className="form-message" id="pin-message" role="status">{message}</p>}
-              </div>
-            ) : (
-              <>
-                <div className="unlocked-note"><i /> Bearbeitung freigeschaltet</div>
-                <p className="dialog-help">Die oberste Person ist die erste Besetzung. Am Griff ziehen, um die Reihenfolge zu ändern.</p>
+            <p className="dialog-help">Die oberste Person ist die erste Besetzung. Am Griff ziehen, um die Reihenfolge zu ändern.</p>
 
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={activePlayers.map((player) => player.id)} strategy={verticalListSortingStrategy}>
@@ -454,8 +401,6 @@ export default function SquadPlanner() {
               <p className="limit-note">3 / 3 Plätze belegt</p>
                 )}
                 {message && <p className="form-message" role="status">{message}</p>}
-              </>
-            )}
           </div>
         )}
       </dialog>
