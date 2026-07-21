@@ -47,6 +47,21 @@ button { color: inherit; }
 .brand-lockup h1 { margin: 4px 0 0; font-size: clamp(1.55rem, 3vw, 2.45rem); line-height: .9; text-transform: uppercase; letter-spacing: -.04em; }
 .eyebrow, .section-index { margin: 0; color: var(--red); font-size: .7rem; line-height: 1.4; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
 .claim-image { width: min(280px, 30vw); height: auto; object-fit: contain; }
+.logout-button { padding: 10px 14px; border: 1px solid rgba(244,243,239,.22); background: transparent; color: #b8b9bd; font-size: .65rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
+.logout-button:hover { border-color: var(--red); color: var(--white); }
+
+.login-shell { min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at 50% 20%, rgba(239,22,28,.14), transparent 28rem), var(--black); }
+.login-card { width: min(440px, 100%); padding: clamp(28px, 6vw, 52px); border: 1px solid rgba(244,243,239,.18); background: #101115; box-shadow: 0 32px 100px rgba(0,0,0,.55); text-align: center; }
+.login-card > img { width: 90px; height: 90px; margin-bottom: 25px; object-fit: contain; }
+.login-card h1 { margin: 10px 0 12px; font-size: clamp(2.4rem, 9vw, 4.5rem); line-height: .9; letter-spacing: -.06em; text-transform: uppercase; }
+.login-card > p:not(.section-index):not(.login-error) { margin: 0 auto 28px; max-width: 330px; color: #a4a5aa; line-height: 1.55; }
+.login-card form { display: grid; text-align: left; }
+.login-card label { margin-bottom: 7px; color: #8f9197; font-size: .65rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+.login-card input { height: 56px; padding: 0 16px; border: 1px solid rgba(244,243,239,.22); outline: 0; background: #08090c; color: var(--white); font-size: 1.25rem; text-align: center; letter-spacing: .35em; }
+.login-card input:focus { border-color: var(--red); }
+.login-card button { height: 52px; margin-top: 10px; border: 1px solid var(--red); background: var(--red); color: var(--white); font-size: .72rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.login-card button:disabled { opacity: .45; cursor: default; }
+.login-error { margin: 14px 0 0; color: #ff8e91; font-size: .8rem; }
 
 .planner-intro {
   display: grid;
@@ -207,6 +222,7 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
   .brand-lockup h1 { font-size: 1.3rem; }
   .eyebrow { font-size: .52rem; letter-spacing: .11em; }
   .claim-image { width: 112px; }
+  .logout-button { padding: 8px; font-size: .55rem; }
   .planner-intro { gap: 22px; padding: 30px 4px 20px; }
   .planner-intro h2 { font-size: 2.45rem; max-width: 330px; }
   .planner-intro > div:first-child > p:last-child { font-size: .85rem; }
