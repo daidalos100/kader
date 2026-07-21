@@ -39,13 +39,18 @@ export async function GET(request: Request) {
   const { url, key } = await config();
   if (!url || !key) return new Response(null, { status: 503 });
 
-  const response = await fetch(
+  let response = await fetch(
     `${url}/storage/v1/object/player-images/${encodeURIComponent(slug)}.webp`,
     { headers: storageHeaders(key), cache: "force-cache" },
   );
-  if (!response.ok) {
-    return new Response(null, { status: response.status === 400 || response.status === 404 ? 404 : 502 });
+
+  if (!response.ok && slug !== "default" && (response.status === 400 || response.status === 404)) {
+    response = await fetch(
+      `${url}/storage/v1/object/player-images/default.webp`,
+      { headers: storageHeaders(key), cache: "force-cache" },
+    );
   }
+  if (!response.ok) return new Response(null, { status: 502 });
 
   return new Response(response.body, {
     headers: {
