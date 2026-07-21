@@ -307,7 +307,7 @@ export default function SquadPlanner() {
       <section className="planner-intro" aria-labelledby="planner-heading">
         <div>
           <p className="section-index">01 / AUFSTELLUNG</p>
-          <h2 id="planner-heading">Neunerfeld. Deine Mannschaft.</h2>
+          <h2 id="planner-heading">Die Mannschaft. 2026/27</h2>
           <p>Position anklicken, bis zu drei Vornamen eintragen und die Reihenfolge per Drag-and-drop festlegen.</p>
         </div>
         <div className="stats" aria-label="Status der Aufstellung">
@@ -329,6 +329,7 @@ export default function SquadPlanner() {
 
       <section className="pitch-wrap" aria-label="Fußball-Neunerfeld">
         <div className="pitch-label top">ANGRIFF</div>
+        <div className="pitch-label middle">MITTELFELD</div>
         <div className="pitch-label bottom">ABWEHR</div>
         <div className="pitch-lines" aria-hidden="true">
           <div className="touchline" />
@@ -369,7 +370,7 @@ export default function SquadPlanner() {
       <footer>
         <span>TSG TÜBINGEN</span>
         <span className="footer-line" />
-        <span>3 · 2 · 3</span>
+        <span>(1)-3-4-1</span>
       </footer>
 
       <dialog
