@@ -15,15 +15,15 @@ async function config() {
   const nodeRuntime = process.env as RuntimeEnv;
   if (nodeRuntime.SUPABASE_URL || nodeRuntime.SUPABASE_SECRET_KEY || nodeRuntime.SUPABASE_PUBLISHABLE_KEY) {
     return {
-      url: nodeRuntime.SUPABASE_URL?.replace(/\/$/, ""),
-      key: nodeRuntime.SUPABASE_SECRET_KEY ?? nodeRuntime.SUPABASE_PUBLISHABLE_KEY,
+      url: nodeRuntime.SUPABASE_URL?.trim().replace(/\/$/, ""),
+      key: (nodeRuntime.SUPABASE_SECRET_KEY ?? nodeRuntime.SUPABASE_PUBLISHABLE_KEY)?.trim(),
     };
   }
 
   const cloudflare = await import("cloudflare:workers");
   const runtime = cloudflare.env as unknown as RuntimeEnv;
-  const url = runtime.SUPABASE_URL?.replace(/\/$/, "");
-  const key = runtime.SUPABASE_SECRET_KEY ?? runtime.SUPABASE_PUBLISHABLE_KEY;
+  const url = runtime.SUPABASE_URL?.trim().replace(/\/$/, "");
+  const key = (runtime.SUPABASE_SECRET_KEY ?? runtime.SUPABASE_PUBLISHABLE_KEY)?.trim();
   return { url, key };
 }
 
