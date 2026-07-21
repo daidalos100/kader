@@ -4,15 +4,24 @@ type Player = { id: string; firstName: string };
 type RuntimeEnv = {
   SUPABASE_URL?: string;
   SUPABASE_SECRET_KEY?: string;
+  SUPABASE_PUBLISHABLE_KEY?: string;
 };
 
 const positionIds = new Set(["st", "lf", "rf", "zm", "zdm", "lv", "iv", "rv", "tw"]);
 
 async function config() {
+  const nodeRuntime = process.env as RuntimeEnv;
+  if (nodeRuntime.SUPABASE_URL && (nodeRuntime.SUPABASE_SECRET_KEY || nodeRuntime.SUPABASE_PUBLISHABLE_KEY)) {
+    return {
+      url: nodeRuntime.SUPABASE_URL.replace(/\/$/, ""),
+      key: nodeRuntime.SUPABASE_SECRET_KEY ?? nodeRuntime.SUPABASE_PUBLISHABLE_KEY!,
+    };
+  }
+
   const cloudflare = await import("cloudflare:workers");
   const runtime = cloudflare.env as unknown as RuntimeEnv;
   const url = runtime.SUPABASE_URL?.replace(/\/$/, "");
-  const key = runtime.SUPABASE_SECRET_KEY;
+  const key = runtime.SUPABASE_SECRET_KEY ?? runtime.SUPABASE_PUBLISHABLE_KEY;
   return url && key ? { url, key } : null;
 }
 
