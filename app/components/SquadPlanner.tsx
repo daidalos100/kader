@@ -55,6 +55,25 @@ function createPlayerId() {
   return `player-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function PlayerAvatar({ firstName, size = 28 }: { firstName: string; size?: number }) {
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => setVisible(true), [firstName]);
+  if (!visible) return null;
+
+  return (
+    <Image
+      className="player-avatar"
+      src={`/api/player-image?name=${encodeURIComponent(firstName)}`}
+      alt={`${firstName}`}
+      width={size}
+      height={size}
+      unoptimized
+      onError={() => setVisible(false)}
+    />
+  );
+}
+
 function SortablePlayer({
   player,
   index,
@@ -95,6 +114,7 @@ function SortablePlayer({
         <span />
       </button>
       <span className="player-rank">{String(index + 1).padStart(2, "0")}</span>
+      <PlayerAvatar firstName={player.firstName} size={38} />
       <strong>{player.firstName}</strong>
       <div className="row-actions">
         <button
@@ -334,7 +354,12 @@ export default function SquadPlanner() {
             >
               <span className="position-badge">{position.short}</span>
               <span className="position-names">
-                {players.length === 0 ? <em>+ Name</em> : players.map((player) => <strong key={player.id}>{player.firstName}</strong>)}
+                {players.length === 0 ? <em>+ Name</em> : players.map((player) => (
+                  <span className="position-player" key={player.id}>
+                    <PlayerAvatar firstName={player.firstName} />
+                    <strong>{player.firstName}</strong>
+                  </span>
+                ))}
               </span>
             </button>
           );
