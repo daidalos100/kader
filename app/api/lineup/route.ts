@@ -30,7 +30,7 @@ async function config() {
 function headers(key: string, extra?: Record<string, string>) {
   return {
     apikey: key,
-    authorization: `Bearer ${key}`,
+    ...(key.startsWith("sb_") ? {} : { authorization: `Bearer ${key}` }),
     "content-type": "application/json",
     ...extra,
   };
