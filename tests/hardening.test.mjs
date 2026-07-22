@@ -1,0 +1,44 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+async function source(path) {
+  return readFile(new URL(`../${path}`, import.meta.url), "utf8");
+}
+
+test("mobile and accessibility safeguards stay present", async () => {
+  const [css, component] = await Promise.all([
+    source("app/globals.css"),
+    source("app/components/CoachingTool.tsx"),
+  ]);
+  for (const marker of [
+    "@media (max-width: 820px)", "@media (max-width: 560px)", "@media (max-width: 380px)",
+    "prefers-reduced-motion", "focus-visible", "safe-area-inset-left", "pointer: coarse",
+  ]) assert.match(css, new RegExp(marker.replace(/[()]/g, "\\$&")));
+  for (const marker of ["aria-live=\"polite\"", "<dialog", "aria-labelledby", "role=\"status\""]) {
+    assert.ok(component.includes(marker), `missing ${marker}`);
+  }
+});
+
+test("security and conflict controls stay present", async () => {
+  const [config, auth, login, stateRoute, migration] = await Promise.all([
+    source("next.config.ts"), source("app/auth.ts"), source("app/login/page.tsx"),
+    source("app/api/coaching-state/route.ts"), source("supabase/phase3-hardening.sql"),
+  ]);
+  for (const header of ["Content-Security-Policy", "X-Content-Type-Options", "X-Frame-Options", "Permissions-Policy"]) {
+    assert.ok(config.includes(header), `missing ${header}`);
+  }
+  assert.ok(auth.includes("HMAC"));
+  assert.ok(auth.includes("sessionMaxAgeSeconds"));
+  assert.ok(login.includes('inputMode="text"'));
+  assert.ok(stateRoute.includes("expectedRevision"));
+  assert.ok(stateRoute.includes("status: 409"));
+  for (const control of ["enable row level security", "apply_coaching_record", "consume_login_attempt", "coaching_history", "coaching_backups"]) {
+    assert.ok(migration.includes(control), `missing ${control}`);
+  }
+});
+
+test("sensitive API routes explicitly prevent shared caching", async () => {
+  const routes = ["app/api/auth/route.ts", "app/api/coaching-state/route.ts", "app/api/history/route.ts"];
+  for (const route of routes) assert.match(await source(route), /private, no-store/);
+});

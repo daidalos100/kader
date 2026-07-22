@@ -3,69 +3,207 @@ export const dynamic = "force-dynamic";
 import { isAuthenticated } from "../../auth";
 import { getSupabaseConfig, supabaseHeaders } from "../../lib/supabase";
 
-const STATE_ID = "d1-2026-27";
+const SEASON_ID = "d1-2026-27";
+const allowedScopes = new Set(["roster", "profile", "attendance", "match_meta", "match_entry", "diagnostic"]);
+
+type RecordRow = {
+  scope: string;
+  record_key: string;
+  data: unknown;
+  revision: number;
+  updated_at: string;
+};
+
+type Operation = {
+  scope: string;
+  key: string;
+  value: unknown;
+  expectedRevision: number;
+};
+
+function privateJson(value: unknown, init: ResponseInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set("cache-control", "private, no-store, max-age=0");
+  headers.set("pragma", "no-cache");
+  return Response.json(value, { ...init, headers });
+}
+
+function emptyState() {
+  return { roster: [] as string[], profiles: {}, attendance: {}, matches: {}, diagnostics: {} };
+}
+
+function splitCompositeKey(value: string) {
+  const index = value.lastIndexOf(":");
+  return index > 0 ? [value.slice(0, index), value.slice(index + 1)] : ["", ""];
+}
+
+function assembleState(rows: RecordRow[]) {
+  const state = emptyState() as {
+    roster: string[];
+    profiles: Record<string, unknown>;
+    attendance: Record<string, Record<string, unknown>>;
+    matches: Record<string, { result: string; entries: Record<string, unknown> }>;
+    diagnostics: Record<string, unknown[]>;
+  };
+  const revisions: Record<string, number> = {};
+
+  for (const row of rows) {
+    revisions[`${row.scope}:${row.record_key}`] = row.revision;
+    if (row.scope === "roster" && typeof row.data === "string") state.roster.push(row.data);
+    if (row.scope === "profile" && row.data && typeof row.data === "object") state.profiles[row.record_key] = row.data;
+    if (row.scope === "attendance") {
+      const [eventId, playerId] = splitCompositeKey(row.record_key);
+      if (eventId && playerId && ["present", "excused", "absent"].includes(String(row.data))) {
+        state.attendance[eventId] ??= {};
+        state.attendance[eventId][playerId] = row.data;
+      }
+    }
+    if (row.scope === "match_meta" && row.data && typeof row.data === "object") {
+      const result = String((row.data as { result?: unknown }).result ?? "").slice(0, 20);
+      state.matches[row.record_key] ??= { result: "", entries: {} };
+      state.matches[row.record_key].result = result;
+    }
+    if (row.scope === "match_entry" && row.data && typeof row.data === "object") {
+      const [eventId, playerId] = splitCompositeKey(row.record_key);
+      if (eventId && playerId) {
+        state.matches[eventId] ??= { result: "", entries: {} };
+        state.matches[eventId].entries[playerId] = row.data;
+      }
+    }
+    if (row.scope === "diagnostic" && row.data && typeof row.data === "object") {
+      const [playerId] = splitCompositeKey(row.record_key);
+      if (playerId) (state.diagnostics[playerId] ??= []).push(row.data);
+    }
+  }
+
+  state.roster.sort((a, b) => a.localeCompare(b, "de"));
+  Object.values(state.diagnostics).forEach((history) => {
+    history.sort((a, b) => String((b as { date?: unknown }).date ?? "").localeCompare(String((a as { date?: unknown }).date ?? "")));
+  });
+  return { state, revisions };
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-export async function GET() {
-  if (!(await isAuthenticated())) {
-    return Response.json({ error: "Nicht angemeldet." }, { status: 401 });
-  }
+function validOperation(value: unknown): value is Operation {
+  if (!isRecord(value)) return false;
+  if (typeof value.scope !== "string" || !allowedScopes.has(value.scope)) return false;
+  if (typeof value.key !== "string" || value.key.length < 1 || value.key.length > 700) return false;
+  if (!Number.isSafeInteger(value.expectedRevision) || Number(value.expectedRevision) < 0) return false;
+  const serialized = JSON.stringify(value.value);
+  if (typeof serialized !== "string" || serialized.length > 25_000) return false;
 
+  if (value.scope === "roster") return typeof value.value === "string" && value.value.trim().length > 0 && value.value.length <= 30;
+  if (value.scope === "attendance") return ["present", "excused", "absent"].includes(String(value.value));
+  if (value.scope === "match_meta") return isRecord(value.value) && typeof value.value.result === "string" && value.value.result.length <= 20;
+  if (value.scope === "match_entry") {
+    return isRecord(value.value) && typeof value.value.appearance === "boolean" &&
+      Number.isInteger(value.value.goals) && Number(value.value.goals) >= 0 && Number(value.value.goals) <= 30 &&
+      Number.isInteger(value.value.assists) && Number(value.value.assists) >= 0 && Number(value.value.assists) <= 30;
+  }
+  if (value.scope === "profile") {
+    if (!isRecord(value.value)) return false;
+    const positions = new Set(["", "TW", "IV", "LV", "RV", "ZDM", "ZM", "LF", "RF", "ST"]);
+    return typeof value.value.id === "string" && value.value.id === value.key &&
+      typeof value.value.firstName === "string" && value.value.firstName.trim().length > 0 && value.value.firstName.length <= 30 &&
+      typeof value.value.shirtNumber === "string" && /^\d{0,3}$/.test(value.value.shirtNumber) &&
+      typeof value.value.primaryPosition === "string" && positions.has(value.value.primaryPosition) &&
+      typeof value.value.secondaryPosition === "string" && positions.has(value.value.secondaryPosition) &&
+      typeof value.value.strongFoot === "string" && ["", "left", "right", "both"].includes(value.value.strongFoot) &&
+      typeof value.value.personality === "string" && value.value.personality.length <= 500;
+  }
+  if (value.scope === "diagnostic") {
+    if (!isRecord(value.value) || typeof value.value.id !== "string" || typeof value.value.date !== "string") return false;
+    const diagnostic = value.value;
+    return ["sprint5", "sprint10", "sprint20", "agility", "endurance", "jump"].every((field) => {
+      const item = diagnostic[field];
+      return item === null || (typeof item === "number" && Number.isFinite(item) && item >= 0 && item <= 10_000);
+    });
+  }
+  return false;
+}
+
+async function legacyState(url: string, key: string) {
+  const response = await fetch(`${url}/rest/v1/coaching_state?select=data,updated_at&id=eq.${SEASON_ID}`, {
+    headers: supabaseHeaders(key), cache: "no-store",
+  });
+  if (!response.ok) return { state: emptyState(), updatedAt: undefined };
+  const rows = (await response.json()) as Array<{ data?: unknown; updated_at?: string }>;
+  return { state: isRecord(rows[0]?.data) ? rows[0].data : emptyState(), updatedAt: rows[0]?.updated_at };
+}
+
+export async function GET() {
+  if (!(await isAuthenticated())) return privateJson({ error: "Nicht angemeldet." }, { status: 401 });
   const { url, key } = await getSupabaseConfig();
-  if (!url || !key) return Response.json({ state: {}, connected: false, setupRequired: true });
+  if (!url || !key) return privateJson({ state: emptyState(), connected: false, setupRequired: true });
 
   try {
     const response = await fetch(
-      `${url}/rest/v1/coaching_state?select=data,updated_at&id=eq.${STATE_ID}`,
+      `${url}/rest/v1/coaching_records?select=scope,record_key,data,revision,updated_at&season_id=eq.${SEASON_ID}`,
       { headers: supabaseHeaders(key), cache: "no-store" },
     );
     if (!response.ok) {
-      return Response.json({ state: {}, connected: true, setupRequired: true });
+      const legacy = await legacyState(url, key);
+      return privateJson({ ...legacy, revisions: {}, connected: true, migrationRequired: true });
     }
-    const rows = (await response.json()) as Array<{ data?: unknown; updated_at?: string }>;
-    return Response.json({
-      state: isRecord(rows[0]?.data) ? rows[0].data : {},
+    const rows = (await response.json()) as RecordRow[];
+    const assembled = assembleState(rows);
+    return privateJson({
+      ...assembled,
       connected: true,
-      setupRequired: rows.length === 0,
-      updatedAt: rows[0]?.updated_at,
+      migrationRequired: false,
+      updatedAt: rows.reduce((latest, row) => row.updated_at > latest ? row.updated_at : latest, ""),
     });
-  } catch {
-    return Response.json({ error: "Coaching-Daten konnten nicht geladen werden." }, { status: 502 });
+  } catch (error) {
+    console.error("coaching_state_read_failed", { message: error instanceof Error ? error.message : "unknown" });
+    return privateJson({ error: "Coaching-Daten konnten nicht geladen werden." }, { status: 502 });
   }
 }
 
-export async function PUT(request: Request) {
-  if (!(await isAuthenticated())) {
-    return Response.json({ error: "Nicht angemeldet." }, { status: 401 });
-  }
-
+export async function PATCH(request: Request) {
+  if (!(await isAuthenticated())) return privateJson({ error: "Nicht angemeldet." }, { status: 401 });
   const { url, key } = await getSupabaseConfig();
-  if (!url || !key) return Response.json({ error: "Supabase ist nicht verbunden." }, { status: 503 });
+  if (!url || !key) return privateJson({ error: "Supabase ist nicht verbunden." }, { status: 503 });
 
   try {
-    const body = (await request.json()) as { state?: unknown };
-    if (!isRecord(body.state) || JSON.stringify(body.state).length > 1_500_000) {
-      return Response.json({ error: "Ungültige Coaching-Daten." }, { status: 400 });
+    const body = (await request.json()) as { operations?: unknown };
+    if (!Array.isArray(body.operations) || body.operations.length < 1 || body.operations.length > 40 || !body.operations.every(validOperation)) {
+      return privateJson({ error: "Ungültige Änderung." }, { status: 400 });
     }
 
-    const response = await fetch(`${url}/rest/v1/coaching_state?on_conflict=id`, {
-      method: "POST",
-      headers: supabaseHeaders(key, { prefer: "resolution=merge-duplicates,return=minimal" }),
-      body: JSON.stringify({ id: STATE_ID, data: body.state, updated_at: new Date().toISOString() }),
-    });
-    if (!response.ok) {
-      const setupRequired = response.status === 404 || response.status === 400;
-      return Response.json(
-        { error: setupRequired ? "Phase-2-Tabelle fehlt in Supabase." : "Speichern fehlgeschlagen.", setupRequired },
-        { status: setupRequired ? 409 : 502 },
-      );
+    const revisions: Record<string, number> = {};
+    for (const operation of body.operations) {
+      const response = await fetch(`${url}/rest/v1/rpc/apply_coaching_record`, {
+        method: "POST",
+        headers: supabaseHeaders(key),
+        cache: "no-store",
+        body: JSON.stringify({
+          p_season_id: SEASON_ID,
+          p_scope: operation.scope,
+          p_record_key: operation.key,
+          p_data: operation.value,
+          p_expected_revision: operation.expectedRevision,
+          p_actor: "trainer",
+        }),
+      });
+      if (!response.ok) {
+        const detail = await response.text();
+        if (detail.includes("revision_conflict") || detail.includes("40001")) {
+          return privateJson({ error: "Dieser Eintrag wurde zwischenzeitlich geändert. Die aktuellen Daten werden neu geladen.", conflict: true }, { status: 409 });
+        }
+        if (response.status === 404 || detail.includes("apply_coaching_record")) {
+          return privateJson({ error: "Die Sicherheitsmigration Phase 3 fehlt noch.", migrationRequired: true }, { status: 409 });
+        }
+        throw new Error(`Supabase ${response.status}: ${detail.slice(0, 160)}`);
+      }
+      const result = (await response.json()) as Array<{ revision?: number }>;
+      revisions[`${operation.scope}:${operation.key}`] = Number(result[0]?.revision ?? operation.expectedRevision + 1);
     }
-    return Response.json({ saved: true, connected: true, updatedAt: new Date().toISOString() });
+    return privateJson({ saved: true, revisions });
   } catch (error) {
-    if (error instanceof SyntaxError) return Response.json({ error: "Ungültige Anfrage." }, { status: 400 });
-    return Response.json({ error: "Coaching-Daten konnten nicht gespeichert werden." }, { status: 502 });
+    console.error("coaching_state_write_failed", { message: error instanceof Error ? error.message : "unknown" });
+    return privateJson({ error: "Coaching-Daten konnten nicht gespeichert werden." }, { status: 502 });
   }
 }

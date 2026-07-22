@@ -50,7 +50,9 @@ export async function GET(request: Request) {
   return new Response(response.body, {
     headers: {
       "content-type": "image/webp",
-      "cache-control": "private, max-age=3600",
+      "cache-control": "private, max-age=86400, stale-while-revalidate=604800",
+      ...(response.headers.get("etag") ? { etag: response.headers.get("etag")! } : {}),
+      "x-content-type-options": "nosniff",
     },
   });
 }

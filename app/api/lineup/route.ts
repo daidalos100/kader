@@ -37,23 +37,28 @@ export async function GET(request: Request) {
   }
 
   try {
-    const response = await fetch(
-      `${supabase.url}/rest/v1/lineup_positions?select=position_id,players&lineup_id=eq.${encodeURIComponent(lineupId)}`,
+    let response = await fetch(
+      `${supabase.url}/rest/v1/lineup_positions?select=position_id,players,revision&lineup_id=eq.${encodeURIComponent(lineupId)}`,
       { headers: supabaseHeaders(supabase.key), cache: "no-store" },
     );
 
     if (!response.ok) {
-      throw new Error(`Supabase responded with ${response.status}`);
+      response = await fetch(
+        `${supabase.url}/rest/v1/lineup_positions?select=position_id,players&lineup_id=eq.${encodeURIComponent(lineupId)}`,
+        { headers: supabaseHeaders(supabase.key), cache: "no-store" },
+      );
+      if (!response.ok) throw new Error(`Supabase responded with ${response.status}`);
     }
 
-    const rows = (await response.json()) as Array<{ position_id: string; players: Player[] }>;
+    const rows = (await response.json()) as Array<{ position_id: string; players: Player[]; revision?: number }>;
     const lineup = Object.fromEntries(
       rows
         .filter((row) => positionIds.has(row.position_id) && validPlayers(row.players))
         .map((row) => [row.position_id, row.players]),
     );
 
-    return Response.json({ lineup, connected: true });
+    const revisions = Object.fromEntries(rows.map((row) => [row.position_id, Number(row.revision ?? 0)]));
+    return Response.json({ lineup, revisions, connected: true, migrationRequired: rows.some((row) => row.revision === undefined) }, { headers: { "cache-control": "private, no-store" } });
   } catch {
     return Response.json(
       { error: "Die Supabase-Aufstellung konnte nicht geladen werden." },
@@ -71,7 +76,7 @@ export async function PATCH(request: Request) {
     return Response.json({ connected: false });
   }
   try {
-    const payload = (await request.json()) as { lineupId?: unknown; positionId?: unknown; players?: unknown };
+    const payload = (await request.json()) as { lineupId?: unknown; positionId?: unknown; players?: unknown; expectedRevision?: unknown };
     const lineupId = typeof payload.lineupId === "string" ? payload.lineupId : "default";
     if (!validLineupId(lineupId)) {
       return Response.json({ error: "Ungültige Aufstellung." }, { status: 400 });
@@ -82,29 +87,38 @@ export async function PATCH(request: Request) {
     if (!validPlayers(payload.players)) {
       return Response.json({ error: "Ungültige Spielerliste." }, { status: 400 });
     }
+    if (!Number.isSafeInteger(payload.expectedRevision) || Number(payload.expectedRevision) < 0) {
+      return Response.json({ error: "Ungültige Revision." }, { status: 400 });
+    }
 
     const players = payload.players.map((player) => ({
       id: player.id,
       firstName: player.firstName.trim(),
     }));
-    const response = await fetch(`${supabase.url}/rest/v1/lineup_positions?on_conflict=lineup_id,position_id`, {
+    const response = await fetch(`${supabase.url}/rest/v1/rpc/apply_lineup_position`, {
       method: "POST",
-      headers: supabaseHeaders(supabase.key, {
-        prefer: "resolution=merge-duplicates,return=minimal",
-      }),
+      headers: supabaseHeaders(supabase.key),
       body: JSON.stringify({
-        lineup_id: lineupId,
-        position_id: payload.positionId,
-        players,
-        updated_at: new Date().toISOString(),
+        p_lineup_id: lineupId,
+        p_position_id: payload.positionId,
+        p_players: players,
+        p_expected_revision: payload.expectedRevision,
       }),
     });
 
     if (!response.ok) {
+      const detail = await response.text();
+      if (detail.includes("revision_conflict") || detail.includes("40001")) {
+        return Response.json({ error: "Diese Position wurde gerade von einem anderen Trainer geändert.", conflict: true }, { status: 409 });
+      }
+      if (response.status === 404 || detail.includes("apply_lineup_position")) {
+        return Response.json({ error: "Die Sicherheitsmigration Phase 3 fehlt noch.", migrationRequired: true }, { status: 409 });
+      }
       throw new Error(`Supabase responded with ${response.status}`);
     }
 
-    return Response.json({ connected: true });
+    const result = (await response.json()) as Array<{ revision?: number }>;
+    return Response.json({ connected: true, revision: Number(result[0]?.revision ?? Number(payload.expectedRevision) + 1) }, { headers: { "cache-control": "private, no-store" } });
   } catch (error) {
     if (error instanceof SyntaxError) {
       return Response.json({ error: "Ungültige Anfrage." }, { status: 400 });

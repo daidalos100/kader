@@ -69,6 +69,8 @@ function PlayerAvatar({ firstName, size = 28 }: { firstName: string; size?: numb
       width={size}
       height={size}
       unoptimized
+      loading="lazy"
+      decoding="async"
       onError={() => setVisible(false)}
     />
   );
@@ -162,6 +164,8 @@ export default function SquadPlanner({
   const [saveState, setSaveState] = useState<SaveState>("loading");
   const [message, setMessage] = useState("");
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const revisionsRef = useRef<Record<string, number>>({});
+  const saveQueuesRef = useRef<Record<string, Promise<void>>>({});
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -177,6 +181,7 @@ export default function SquadPlanner({
         if (!response.ok) throw new Error(data.error ?? "Aufstellung konnte nicht geladen werden.");
         if (!cancelled) {
           setLineup({ ...emptyLineup(), ...data.lineup });
+          revisionsRef.current = data.revisions ?? {};
           setSaveState(data.connected ? "saved" : "offline");
         }
       })
@@ -190,7 +195,7 @@ export default function SquadPlanner({
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/players", { cache: "no-store" })
+    fetch("/api/players")
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Spielerliste konnte nicht geladen werden.");
@@ -232,21 +237,39 @@ export default function SquadPlanner({
     setMessage("");
   }
 
-  async function persist(positionId: string, players: Player[]) {
+  async function persistNow(positionId: string, players: Player[]) {
     setSaveState("saving");
     try {
       const response = await fetch("/api/lineup", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ lineupId, positionId, players }),
+        body: JSON.stringify({ lineupId, positionId, players, expectedRevision: revisionsRef.current[positionId] ?? 0 }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Speichern fehlgeschlagen.");
+      if (!response.ok) {
+        if (data.conflict) {
+          const latestResponse = await fetch(`/api/lineup?lineupId=${encodeURIComponent(lineupId)}`, { cache: "no-store" });
+          const latest = await latestResponse.json();
+          if (latestResponse.ok) {
+            setLineup({ ...emptyLineup(), ...latest.lineup });
+            revisionsRef.current = latest.revisions ?? {};
+          }
+        }
+        throw new Error(data.error ?? "Speichern fehlgeschlagen.");
+      }
+      revisionsRef.current[positionId] = Number(data.revision ?? (revisionsRef.current[positionId] ?? 0) + 1);
       setSaveState(data.connected ? "saved" : "offline");
-    } catch {
+    } catch (error) {
       setSaveState("error");
-      setMessage("Die Änderung ist sichtbar, konnte aber noch nicht gespeichert werden.");
+      setMessage(error instanceof Error ? error.message : "Die Änderung konnte nicht gespeichert werden.");
     }
+  }
+
+  function persist(positionId: string, players: Player[]) {
+    const previous = saveQueuesRef.current[positionId] ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(() => persistNow(positionId, players));
+    saveQueuesRef.current[positionId] = next;
+    return next;
   }
 
   function updatePlayers(positionId: string, players: Player[]) {

@@ -41,11 +41,14 @@ export default function LoginPage() {
           <input
             id="site-pin"
             type="password"
-            inputMode="numeric"
+            inputMode="text"
             autoComplete="current-password"
+            autoCapitalize="none"
+            spellCheck={false}
+            maxLength={128}
             autoFocus
             value={pin}
-            onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 8))}
+            onChange={(event) => setPin(event.target.value)}
           />
           <button type="submit" disabled={!pin || loading}>{loading ? "Prüft …" : "Aufstellung öffnen"}</button>
         </form>

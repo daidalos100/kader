@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import SquadPlanner from "./SquadPlanner";
 import type { CalendarEvent } from "../lib/calendar";
 
@@ -35,6 +35,8 @@ type CoachingState = {
   matches: Record<string, MatchData>;
   diagnostics: Record<string, Diagnostic[]>;
 };
+type SaveOperation = { scope: string; key: string; value: unknown; expectedRevision: number };
+type HistoryEntry = { id: number; scope: string; record_key: string; revision: number; changed_at: string; changed_by: string };
 
 const positionOptions = ["TW", "IV", "LV", "RV", "ZDM", "ZM", "LF", "RF", "ST"];
 const emptyState: CoachingState = { roster: [], profiles: {}, attendance: {}, matches: {}, diagnostics: {} };
@@ -91,8 +93,9 @@ export default function CoachingTool() {
   const [diagnosticPlayer, setDiagnosticPlayer] = useState<Profile | null>(null);
   const [flipped, setFlipped] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [setupRequired, setSetupRequired] = useState(false);
+  const [pendingSaves, setPendingSaves] = useState(0);
+  const [revisions, setRevisions] = useState<Record<string, number>>({});
+  const [migrationRequired, setMigrationRequired] = useState(false);
   const [notice, setNotice] = useState("");
   const [newRosterName, setNewRosterName] = useState("");
   const [referenceTime] = useState(() => Date.now());
@@ -116,7 +119,7 @@ export default function CoachingTool() {
       fetch("/api/coaching-state", { cache: "no-store" }).then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Daten konnten nicht geladen werden.");
-        return data as { state: unknown; setupRequired?: boolean };
+        return data as { state: unknown; revisions?: Record<string, number>; migrationRequired?: boolean };
       }),
       fetch("/api/lineup?lineupId=default", { cache: "no-store" }).then(async (response) => {
         if (!response.ok) return [] as string[];
@@ -128,7 +131,8 @@ export default function CoachingTool() {
         if (cancelled) return;
         setEvents(calendarEvents);
         setState(normalizeState(coaching.state, lineupNames));
-        setSetupRequired(Boolean(coaching.setupRequired));
+        setRevisions(coaching.revisions ?? {});
+        setMigrationRequired(Boolean(coaching.migrationRequired));
       })
       .catch((error: Error) => {
         if (!cancelled) setNotice(error.message);
@@ -137,24 +141,39 @@ export default function CoachingTool() {
     return () => { cancelled = true; };
   }, []);
 
-  async function save(next: CoachingState) {
+  async function refreshCoachingState() {
+    const response = await fetch("/api/coaching-state", { cache: "no-store" });
+    const data = await response.json() as { state?: unknown; revisions?: Record<string, number>; migrationRequired?: boolean; error?: string };
+    if (!response.ok) throw new Error(data.error ?? "Daten konnten nicht neu geladen werden.");
+    setState(normalizeState(data.state));
+    setRevisions(data.revisions ?? {});
+    setMigrationRequired(Boolean(data.migrationRequired));
+  }
+
+  function operation(scope: string, key: string, value: unknown): SaveOperation {
+    return { scope, key, value, expectedRevision: revisions[`${scope}:${key}`] ?? 0 };
+  }
+
+  async function save(next: CoachingState, operations: SaveOperation[]) {
     setState(next);
-    setSaving(true);
+    setPendingSaves((count) => count + 1);
     setNotice("");
     try {
       const response = await fetch("/api/coaching-state", {
-        method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ state: next }),
+        method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ operations }),
       });
       const data = await response.json();
       if (!response.ok) {
-        setSetupRequired(Boolean(data.setupRequired));
+        setMigrationRequired(Boolean(data.migrationRequired));
+        if (data.conflict) await refreshCoachingState();
         throw new Error(data.error ?? "Speichern fehlgeschlagen.");
       }
-      setSetupRequired(false);
+      setRevisions((current) => ({ ...current, ...(data.revisions ?? {}) }));
+      setMigrationRequired(false);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Speichern fehlgeschlagen.");
     } finally {
-      setSaving(false);
+      setPendingSaves((count) => Math.max(0, count - 1));
     }
   }
 
@@ -170,14 +189,15 @@ export default function CoachingTool() {
     void save({
       ...state,
       attendance: { ...state.attendance, [eventId]: { ...(state.attendance[eventId] ?? {}), [id]: status } },
-    });
+    }, [operation("attendance", `${eventId}:${id}`, status)]);
   }
 
   function setAllPresent(eventId: string) {
+    const nextAttendance = Object.fromEntries(profiles.map((player) => [player.id, "present"])) as Record<string, AttendanceStatus>;
     void save({
       ...state,
-      attendance: { ...state.attendance, [eventId]: Object.fromEntries(profiles.map((player) => [player.id, "present"])) },
-    });
+      attendance: { ...state.attendance, [eventId]: nextAttendance },
+    }, profiles.map((player) => operation("attendance", `${eventId}:${player.id}`, "present")));
   }
 
   function saveProfile(event: FormEvent<HTMLFormElement>) {
@@ -193,7 +213,7 @@ export default function CoachingTool() {
       personality: String(form.get("personality") ?? "").trim().slice(0, 500),
     };
     setEditingProfile(null);
-    void save({ ...state, profiles: { ...state.profiles, [profile.id]: profile } });
+    void save({ ...state, profiles: { ...state.profiles, [profile.id]: profile } }, [operation("profile", profile.id, profile)]);
   }
 
   function addRosterPlayer(event: FormEvent<HTMLFormElement>) {
@@ -201,18 +221,29 @@ export default function CoachingTool() {
     const name = newRosterName.trim().replace(/\s+/g, " ").slice(0, 30);
     if (!name || state.roster.some((item) => item.localeCompare(name, "de", { sensitivity: "base" }) === 0)) return;
     setNewRosterName("");
-    void save({ ...state, roster: [...state.roster, name].sort((a, b) => a.localeCompare(b, "de")) });
+    void save(
+      { ...state, roster: [...state.roster, name].sort((a, b) => a.localeCompare(b, "de")) },
+      [operation("roster", playerId(name), name)],
+    );
   }
 
   function updateMatch(eventId: string, patch: Partial<MatchData>) {
     const current = state.matches[eventId] ?? { result: "", entries: {} };
-    void save({ ...state, matches: { ...state.matches, [eventId]: { ...current, ...patch } } });
+    const next = { ...current, ...patch };
+    void save(
+      { ...state, matches: { ...state.matches, [eventId]: next } },
+      [operation("match_meta", eventId, { result: next.result })],
+    );
   }
 
   function updateMatchEntry(eventId: string, id: string, patch: Partial<MatchEntry>) {
     const current = state.matches[eventId] ?? { result: "", entries: {} };
     const entry = current.entries[id] ?? { appearance: false, goals: 0, assists: 0 };
-    updateMatch(eventId, { entries: { ...current.entries, [id]: { ...entry, ...patch } } });
+    const nextEntry = { ...entry, ...patch };
+    void save(
+      { ...state, matches: { ...state.matches, [eventId]: { ...current, entries: { ...current.entries, [id]: nextEntry } } } },
+      [operation("match_entry", `${eventId}:${id}`, nextEntry)],
+    );
   }
 
   function addDiagnostic(event: FormEvent<HTMLFormElement>) {
@@ -227,7 +258,10 @@ export default function CoachingTool() {
     };
     const history = [...(state.diagnostics[diagnosticPlayer.id] ?? []), diagnostic].sort((a, b) => b.date.localeCompare(a.date));
     setDiagnosticPlayer(null);
-    void save({ ...state, diagnostics: { ...state.diagnostics, [diagnosticPlayer.id]: history } });
+    void save(
+      { ...state, diagnostics: { ...state.diagnostics, [diagnosticPlayer.id]: history } },
+      [operation("diagnostic", `${diagnosticPlayer.id}:${diagnostic.id}`, diagnostic)],
+    );
   }
 
   async function logout() {
@@ -264,15 +298,15 @@ export default function CoachingTool() {
           ))}
         </nav>
         <div className="coach-header-actions">
-          <span className={saving ? "saving active" : "saving"}>{saving ? "Speichert …" : "Bereit"}</span>
+          <span className={pendingSaves ? "saving active" : "saving"} aria-live="polite">{pendingSaves ? "Speichert …" : "Gespeichert"}</span>
           <button className="logout-button" type="button" onClick={logout}>Abmelden</button>
         </div>
       </header>
 
-      {setupRequired && (
+      {migrationRequired && (
         <aside className="setup-banner">
-          <strong>Einmalige Freigabe für Phase 2 fehlt.</strong>
-          <span>Bitte die Datei <code>supabase/phase2.sql</code> einmal im Supabase SQL Editor ausführen. Kalender und Aufstellung funktionieren bereits.</span>
+          <strong>Sicherheitsmigration Phase 3 fehlt.</strong>
+          <span>Bitte <code>supabase/phase3-hardening.sql</code> einmal im Supabase SQL Editor ausführen. Bestehende Daten bleiben erhalten.</span>
         </aside>
       )}
       {notice && <p className="coach-notice" role="status">{notice}</p>}
@@ -299,6 +333,7 @@ export default function CoachingTool() {
               </div>
               <div className="section-heading"><div><p className="section-index">DIE NÄCHSTEN TERMINE</p><h2>Kalender</h2></div><button className="text-button" onClick={() => setTab("calendar")}>Alle anzeigen →</button></div>
               <div className="event-strip">{nextEvents.map((event) => <EventCard key={event.id} event={event} onOpen={openEvent} />)}</div>
+              {!migrationRequired && <HistoryPanel onRestored={refreshCoachingState} />}
             </section>
           )}
 
@@ -350,7 +385,7 @@ export default function CoachingTool() {
                 <div className="stats-table-wrap"><StatsTable rows={statsRows} /></div>
                 <aside className="match-editor">
                   <label>Spiel auswählen<select value={selectedEvent?.id ?? ""} onChange={(event) => setSelectedEvent(events.find((item) => item.id === event.target.value) ?? null)}><option value="">Bitte wählen</option>{events.filter((item) => item.type === "game" || item.type === "tournament").map((item) => <option key={item.id} value={item.id}>{formatDate(item.start, false)} · {item.title}</option>)}</select></label>
-                  {selectedEvent && <MatchEditor event={selectedEvent} profiles={profiles} data={state.matches[selectedEvent.id] ?? { result: "", entries: {} }} onResult={(result) => updateMatch(selectedEvent.id, { result })} onEntry={(id, patch) => updateMatchEntry(selectedEvent.id, id, patch)} />}
+                  {selectedEvent && <MatchEditor key={selectedEvent.id} event={selectedEvent} profiles={profiles} data={state.matches[selectedEvent.id] ?? { result: "", entries: {} }} onResult={(result) => updateMatch(selectedEvent.id, { result })} onEntry={(id, patch) => updateMatchEntry(selectedEvent.id, id, patch)} />}
                 </aside>
               </div>
             </section>
@@ -362,6 +397,65 @@ export default function CoachingTool() {
       {diagnosticPlayer && <DiagnosticDialog profile={diagnosticPlayer} onClose={() => setDiagnosticPlayer(null)} onSubmit={addDiagnostic} />}
     </main>
   );
+}
+
+function historyLabel(entry: HistoryEntry) {
+  const labels: Record<string, string> = {
+    roster: "Teamliste", profile: "Spielerprofil", attendance: "Trainingsteilnahme",
+    match_meta: "Spielergebnis", match_entry: "Spielstatistik", diagnostic: "Leistungsdiagnostik",
+  };
+  const subject = entry.scope === "profile" || entry.scope === "roster" || entry.scope === "diagnostic"
+    ? entry.record_key.split(":")[0].replace(/-/g, " ")
+    : "";
+  return `${labels[entry.scope] ?? "Eintrag"}${subject ? ` · ${subject}` : ""}`;
+}
+
+function HistoryPanel({ onRestored }: { onRestored: () => Promise<void> }) {
+  const [entries, setEntries] = useState<HistoryEntry[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function load() {
+    const response = await fetch("/api/history", { cache: "no-store" });
+    const data = await response.json() as { history?: HistoryEntry[]; error?: string };
+    if (!response.ok) throw new Error(data.error ?? "Verlauf konnte nicht geladen werden.");
+    setEntries(data.history ?? []);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/history", { cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json() as { history?: HistoryEntry[]; error?: string };
+        if (!response.ok) throw new Error(data.error ?? "Verlauf konnte nicht geladen werden.");
+        if (!cancelled) setEntries(data.history ?? []);
+      })
+      .catch((reason: Error) => { if (!cancelled) setError(reason.message); });
+    return () => { cancelled = true; };
+  }, []);
+
+  async function restore(entry: HistoryEntry) {
+    if (!window.confirm("Diesen Eintrag auf den unmittelbar vorherigen Stand zurücksetzen?")) return;
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/history", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ historyId: entry.id }),
+      });
+      const data = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Wiederherstellung fehlgeschlagen.");
+      await Promise.all([onRestored(), load()]);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Wiederherstellung fehlgeschlagen.");
+    } finally { setBusy(false); }
+  }
+
+  return <section className="history-panel" aria-labelledby="history-title">
+    <div className="section-heading"><div><p className="section-index">SICHERUNG &amp; VERLAUF</p><h2 id="history-title">Letzte Änderungen</h2></div><a className="text-button" href="/api/backup" download>Backup herunterladen ↓</a></div>
+    {error && <p className="coach-notice" role="status">{error}</p>}
+    {!entries.length && !error ? <p className="history-empty">Noch keine Änderungen im neuen Verlauf.</p> : <ol className="history-list">
+      {entries.slice(0, 10).map((entry) => <li key={entry.id}><div><strong>{historyLabel(entry)}</strong><time dateTime={entry.changed_at}>{new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" }).format(new Date(entry.changed_at))}</time></div><button type="button" disabled={busy} onClick={() => void restore(entry)}>Rückgängig</button></li>)}
+    </ol>}
+  </section>;
 }
 
 function EventCard({ event, active, onOpen }: { event: CalendarEvent; active?: boolean; onOpen: (event: CalendarEvent, target: "attendance" | "lineup" | "stats") => void }) {
@@ -389,13 +483,17 @@ function StatsTable({ rows }: { rows: Array<{ player: Profile; appearances: numb
 }
 
 function MatchEditor({ event, profiles, data, onResult, onEntry }: { event: CalendarEvent; profiles: Profile[]; data: MatchData; onResult: (value: string) => void; onEntry: (id: string, patch: Partial<MatchEntry>) => void }) {
-  return <div className="match-panel"><p className="section-index">SPIELSTATISTIK</p><h2>{event.title}</h2><label>Ergebnis<input value={data.result} onChange={(e) => onResult(e.target.value.slice(0, 20))} placeholder="z. B. 3:1" /></label><div className="match-player-list">{profiles.map((player) => { const entry = data.entries[player.id] ?? { appearance: false, goals: 0, assists: 0 }; return <div key={player.id}><label className="appearance"><input type="checkbox" checked={entry.appearance} onChange={(e) => onEntry(player.id, { appearance: e.target.checked })} /><span>{player.firstName}</span></label><label>Tore<input type="number" min="0" max="30" value={entry.goals} onChange={(e) => onEntry(player.id, { goals: Math.max(0, Number(e.target.value)) })} /></label><label>Assists<input type="number" min="0" max="30" value={entry.assists} onChange={(e) => onEntry(player.id, { assists: Math.max(0, Number(e.target.value)) })} /></label></div>; })}</div></div>;
+  return <div className="match-panel"><p className="section-index">SPIELSTATISTIK</p><h2>{event.title}</h2><label>Ergebnis<input defaultValue={data.result} onBlur={(e) => onResult(e.target.value.trim().slice(0, 20))} placeholder="z. B. 3:1" /></label><div className="match-player-list">{profiles.map((player) => { const entry = data.entries[player.id] ?? { appearance: false, goals: 0, assists: 0 }; return <div key={player.id}><label className="appearance"><input type="checkbox" checked={entry.appearance} onChange={(e) => onEntry(player.id, { appearance: e.target.checked })} /><span>{player.firstName}</span></label><label>Tore<input type="number" min="0" max="30" defaultValue={entry.goals} onBlur={(e) => onEntry(player.id, { goals: Math.min(30, Math.max(0, Number(e.target.value) || 0)) })} /></label><label>Assists<input type="number" min="0" max="30" defaultValue={entry.assists} onBlur={(e) => onEntry(player.id, { assists: Math.min(30, Math.max(0, Number(e.target.value) || 0)) })} /></label></div>; })}</div></div>;
 }
 
 function ProfileDialog({ profile, onClose, onSubmit }: { profile: Profile; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><form className="coach-modal" onSubmit={onSubmit}><button className="close-dialog" type="button" onClick={onClose}>×</button><p className="section-index">SPIELERPROFIL</p><h2>{profile.firstName}</h2><div className="form-grid"><label>Trikotnummer<input name="shirtNumber" type="number" min="0" max="999" defaultValue={profile.shirtNumber} /></label><label>Hauptposition<select name="primaryPosition" defaultValue={profile.primaryPosition}><option value="">Bitte wählen</option>{positionOptions.map((position) => <option key={position}>{position}</option>)}</select></label><label>Ersatzposition<select name="secondaryPosition" defaultValue={profile.secondaryPosition}><option value="">Keine</option>{positionOptions.map((position) => <option key={position}>{position}</option>)}</select></label><label>Starker Fuß<select name="strongFoot" defaultValue={profile.strongFoot}><option value="">Bitte wählen</option><option value="left">Links</option><option value="right">Rechts</option><option value="both">Beide</option></select></label><label className="wide">Spielerpersönlichkeit<textarea name="personality" defaultValue={profile.personality} rows={4} placeholder="Stärken, Rolle im Team, Coaching-Hinweise …" /></label></div><button className="primary-button" type="submit">Profil speichern</button></form></div>;
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => { const dialog = dialogRef.current; dialog?.showModal(); return () => dialog?.close(); }, []);
+  return <dialog ref={dialogRef} className="modal-backdrop" aria-labelledby="profile-dialog-title" onCancel={(e) => { e.preventDefault(); onClose(); }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><form className="coach-modal" onSubmit={onSubmit}><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">SPIELERPROFIL</p><h2 id="profile-dialog-title">{profile.firstName}</h2><div className="form-grid"><label>Trikotnummer<input autoFocus name="shirtNumber" type="number" min="0" max="999" defaultValue={profile.shirtNumber} /></label><label>Hauptposition<select name="primaryPosition" defaultValue={profile.primaryPosition}><option value="">Bitte wählen</option>{positionOptions.map((position) => <option key={position}>{position}</option>)}</select></label><label>Ersatzposition<select name="secondaryPosition" defaultValue={profile.secondaryPosition}><option value="">Keine</option>{positionOptions.map((position) => <option key={position}>{position}</option>)}</select></label><label>Starker Fuß<select name="strongFoot" defaultValue={profile.strongFoot}><option value="">Bitte wählen</option><option value="left">Links</option><option value="right">Rechts</option><option value="both">Beide</option></select></label><label className="wide">Spielerpersönlichkeit<textarea name="personality" defaultValue={profile.personality} rows={4} placeholder="Stärken, Rolle im Team, Coaching-Hinweise …" /></label></div><button className="primary-button" type="submit">Profil speichern</button></form></dialog>;
 }
 
 function DiagnosticDialog({ profile, onClose, onSubmit }: { profile: Profile; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><form className="coach-modal" onSubmit={onSubmit}><button className="close-dialog" type="button" onClick={onClose}>×</button><p className="section-index">LEISTUNGSDIAGNOSTIK</p><h2>{profile.firstName}</h2><div className="form-grid diagnostic-form"><label>Datum<input name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></label><span /><label>Sprint 5 m (Sek.)<input name="sprint5" inputMode="decimal" /></label><label>Sprint 10 m (Sek.)<input name="sprint10" inputMode="decimal" /></label><label>Sprint 20 m (Sek.)<input name="sprint20" inputMode="decimal" /></label><label>Agility (Sek.)<input name="agility" inputMode="decimal" /></label><label>Ausdauerwert<input name="endurance" inputMode="decimal" /></label><label>Sprungkraft (cm)<input name="jump" inputMode="decimal" /></label></div><button className="primary-button" type="submit">Messung speichern</button></form></div>;
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => { const dialog = dialogRef.current; dialog?.showModal(); return () => dialog?.close(); }, []);
+  return <dialog ref={dialogRef} className="modal-backdrop" aria-labelledby="diagnostic-dialog-title" onCancel={(e) => { e.preventDefault(); onClose(); }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><form className="coach-modal" onSubmit={onSubmit}><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">LEISTUNGSDIAGNOSTIK</p><h2 id="diagnostic-dialog-title">{profile.firstName}</h2><div className="form-grid diagnostic-form"><label>Datum<input autoFocus name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></label><span /><label>Sprint 5 m (Sek.)<input name="sprint5" inputMode="decimal" /></label><label>Sprint 10 m (Sek.)<input name="sprint10" inputMode="decimal" /></label><label>Sprint 20 m (Sek.)<input name="sprint20" inputMode="decimal" /></label><label>Agility (Sek.)<input name="agility" inputMode="decimal" /></label><label>Ausdauerwert<input name="endurance" inputMode="decimal" /></label><label>Sprungkraft (cm)<input name="jump" inputMode="decimal" /></label></div><button className="primary-button" type="submit">Messung speichern</button></form></dialog>;
 }

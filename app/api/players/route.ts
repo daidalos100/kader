@@ -7,6 +7,12 @@ type StoredPlayer = { firstName?: unknown };
 type LineupRow = { players?: StoredPlayer[] };
 type StorageObject = { name?: string };
 
+function playersJson(value: unknown, init: ResponseInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set("cache-control", "private, max-age=300, stale-while-revalidate=600");
+  return Response.json(value, { ...init, headers });
+}
+
 function slugify(value: string) {
   return value
     .normalize("NFD")
@@ -25,14 +31,17 @@ function displayNameFromSlug(value: string) {
 
 export async function GET() {
   if (!(await isAuthenticated())) {
-    return Response.json({ error: "Nicht angemeldet." }, { status: 401 });
+    return playersJson({ error: "Nicht angemeldet." }, { status: 401 });
   }
 
   const { url, key } = await getSupabaseConfig();
-  if (!url || !key) return Response.json({ players: [], connected: false });
+  if (!url || !key) return playersJson({ players: [], connected: false });
 
   try {
-    const [stateResponse, lineupResponse, storageResponse] = await Promise.all([
+    const [recordsResponse, legacyResponse, lineupResponse, storageResponse] = await Promise.all([
+      fetch(`${url}/rest/v1/coaching_records?select=scope,record_key,data&season_id=eq.d1-2026-27&scope=in.(roster,profile)`, {
+        headers: supabaseHeaders(key), cache: "no-store",
+      }),
       fetch(`${url}/rest/v1/coaching_state?select=data&id=eq.d1-2026-27`, {
         headers: supabaseHeaders(key), cache: "no-store",
       }),
@@ -48,8 +57,19 @@ export async function GET() {
     ]);
 
     const exactNames = new Map<string, string>();
-    if (stateResponse.ok) {
-      const rows = (await stateResponse.json()) as Array<{ data?: { roster?: unknown; profiles?: unknown } }>;
+    if (recordsResponse.ok) {
+      const records = (await recordsResponse.json()) as Array<{ scope?: string; data?: unknown }>;
+      records.forEach((record) => {
+        if (record.scope === "roster" && typeof record.data === "string" && record.data.trim()) {
+          exactNames.set(slugify(record.data), record.data.trim());
+        }
+        if (record.scope === "profile" && record.data && typeof record.data === "object") {
+          const firstName = (record.data as StoredPlayer).firstName;
+          if (typeof firstName === "string" && firstName.trim()) exactNames.set(slugify(firstName), firstName.trim());
+        }
+      });
+    } else if (legacyResponse.ok) {
+      const rows = (await legacyResponse.json()) as Array<{ data?: { roster?: unknown; profiles?: unknown } }>;
       const data = rows[0]?.data;
       if (Array.isArray(data?.roster)) {
         data.roster.forEach((name) => {
@@ -89,8 +109,9 @@ export async function GET() {
       .map(([id, firstName]) => ({ id, firstName }))
       .sort((a, b) => a.firstName.localeCompare(b.firstName, "de"));
 
-    return Response.json({ players, connected: true });
-  } catch {
-    return Response.json({ error: "Die Spielerliste konnte nicht geladen werden." }, { status: 502 });
+    return playersJson({ players, connected: true });
+  } catch (error) {
+    console.error("players_read_failed", { message: error instanceof Error ? error.message : "unknown" });
+    return playersJson({ error: "Die Spielerliste konnte nicht geladen werden." }, { status: 502 });
   }
 }
