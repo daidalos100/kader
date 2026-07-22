@@ -117,14 +117,16 @@ begin
   for update;
 
   if current_revision is null then
-    if coalesce(p_expected_revision, 0) <> 0 then raise exception 'revision_conflict' using errcode = '40001'; end if;
+    if coalesce(p_expected_revision, 0) <> 0 then
+      raise sqlstate 'PT409' using message = 'revision_conflict';
+    end if;
     return query
       insert into public.lineup_positions (lineup_id, position_id, players, revision)
       values (p_lineup_id, p_position_id, p_players, 1)
       returning lineup_positions.revision, lineup_positions.updated_at;
   else
     if p_expected_revision is null or current_revision <> p_expected_revision then
-      raise exception 'revision_conflict' using errcode = '40001';
+      raise sqlstate 'PT409' using message = 'revision_conflict';
     end if;
     return query
       update public.lineup_positions
@@ -189,7 +191,7 @@ begin
 
   if current_revision is null then
     if coalesce(p_expected_revision, 0) <> 0 then
-      raise exception 'revision_conflict' using errcode = '40001';
+      raise sqlstate 'PT409' using message = 'revision_conflict';
     end if;
     return query
       insert into public.coaching_records (season_id, scope, record_key, data, revision, updated_by)
@@ -197,7 +199,7 @@ begin
       returning coaching_records.revision, coaching_records.updated_at;
   else
     if p_expected_revision is null or current_revision <> p_expected_revision then
-      raise exception 'revision_conflict' using errcode = '40001';
+      raise sqlstate 'PT409' using message = 'revision_conflict';
     end if;
     return query
       update public.coaching_records

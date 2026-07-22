@@ -36,6 +36,8 @@ test("security and conflict controls stay present", async () => {
   for (const control of ["enable row level security", "apply_coaching_record", "consume_login_attempt", "coaching_history", "coaching_backups"]) {
     assert.ok(migration.includes(control), `missing ${control}`);
   }
+  assert.ok(migration.includes("raise sqlstate 'PT409'"));
+  assert.ok(!migration.includes("errcode = '40001'"), "serialization errors must not be used for user conflicts");
 });
 
 test("sensitive API routes explicitly prevent shared caching", async () => {
