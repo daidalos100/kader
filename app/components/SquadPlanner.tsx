@@ -19,9 +19,10 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Image from "next/image";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Player = { id: string; firstName: string };
+type RosterPlayer = { id: string; firstName: string };
 type Lineup = Record<string, Player[]>;
 type SaveState = "idle" | "loading" | "saving" | "saved" | "offline" | "error";
 
@@ -155,11 +156,11 @@ export default function SquadPlanner({
   eventTitle?: string;
 }) {
   const [lineup, setLineup] = useState<Lineup>(emptyLineup);
+  const [availablePlayers, setAvailablePlayers] = useState<RosterPlayer[]>([]);
   const [activePosition, setActivePosition] = useState<Position | null>(null);
-  const [newName, setNewName] = useState("");
+  const [playersLoading, setPlayersLoading] = useState(true);
   const [saveState, setSaveState] = useState<SaveState>("loading");
   const [message, setMessage] = useState("");
-  const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   const sensors = useSensors(
@@ -188,9 +189,25 @@ export default function SquadPlanner({
   }, [lineupId]);
 
   useEffect(() => {
+    let cancelled = false;
+    fetch("/api/players", { cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error ?? "Spielerliste konnte nicht geladen werden.");
+        if (!cancelled) setAvailablePlayers(data.players ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setMessage("Die Spielerliste konnte nicht geladen werden.");
+      })
+      .finally(() => {
+        if (!cancelled) setPlayersLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
     if (activePosition && dialogRef.current && !dialogRef.current.open) {
       dialogRef.current.showModal();
-      window.setTimeout(() => inputRef.current?.focus(), 80);
     }
   }, [activePosition]);
 
@@ -205,7 +222,6 @@ export default function SquadPlanner({
   );
 
   function openPosition(position: Position) {
-    setNewName("");
     setMessage("");
     setActivePosition(position);
   }
@@ -238,24 +254,21 @@ export default function SquadPlanner({
     void persist(positionId, players);
   }
 
-  function addPlayer(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function togglePlayer(candidate: RosterPlayer) {
     if (!activePosition) return;
-    const firstName = newName.trim().replace(/\s+/g, " ");
-    if (!firstName) return;
+    const selected = activePlayers.find(
+      (player) => player.firstName.localeCompare(candidate.firstName, "de", { sensitivity: "base" }) === 0,
+    );
+    if (selected) {
+      setMessage("");
+      updatePlayers(activePosition.id, activePlayers.filter((player) => player.id !== selected.id));
+      return;
+    }
     if (activePlayers.length >= 3) {
       setMessage("Pro Position sind maximal drei Personen möglich.");
       return;
     }
-    if (firstName.length > 30) {
-      setMessage("Bitte den Vornamen auf 30 Zeichen begrenzen.");
-      return;
-    }
-    const players = [
-      ...activePlayers,
-      { id: createPlayerId(), firstName },
-    ];
-    setNewName("");
+    const players = [...activePlayers, { id: createPlayerId(), firstName: candidate.firstName }];
     setMessage("");
     updatePlayers(activePosition.id, players);
   }
@@ -315,7 +328,7 @@ export default function SquadPlanner({
         <div>
           <p className="section-index">{eventTitle ? "TERMIN-AUFSTELLUNG" : "01 / AUFSTELLUNG"}</p>
           <h2 id="planner-heading">{eventTitle || "Die Mannschaft. 2026/27"}</h2>
-          <p>Position anklicken, bis zu drei Vornamen eintragen und die Reihenfolge per Drag-and-drop festlegen.</p>
+          <p>Position anklicken, bis zu drei Spieler:innen auswählen und die Reihenfolge per Drag-and-drop festlegen.</p>
         </div>
         <div className="stats" aria-label="Status der Aufstellung">
           <div><strong>{occupiedPositions}</strong><span>von 9 Positionen</span></div>
@@ -395,7 +408,7 @@ export default function SquadPlanner({
             <button className="close-dialog" type="button" onClick={closeDialog} aria-label="Fenster schließen">×</button>
             <p className="section-index">POSITION {activePosition.short}</p>
             <h3>{activePosition.label}</h3>
-            <p className="dialog-help">Die Reihenfolge kann am Griff per Drag-and-drop angepasst werden.</p>
+            <p className="dialog-help">Bis zu drei Spieler:innen auswählen. Die Reihenfolge kann anschließend am Griff per Drag-and-drop angepasst werden.</p>
 
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={activePlayers.map((player) => player.id)} strategy={verticalListSortingStrategy}>
@@ -414,26 +427,36 @@ export default function SquadPlanner({
               </SortableContext>
                 </DndContext>
 
-                {activePlayers.length < 3 ? (
-              <form className="add-player-form" onSubmit={addPlayer}>
-                <label htmlFor="first-name">Vorname</label>
-                <div>
-                  <input
-                    ref={inputRef}
-                    id="first-name"
-                    name="firstName"
-                    value={newName}
-                    onChange={(event) => setNewName(event.target.value)}
-                    placeholder="z. B. Toni"
-                    autoComplete="off"
-                    maxLength={30}
-                  />
-                  <button type="submit" disabled={!newName.trim()}>Hinzufügen</button>
+            <div className="player-picker" aria-label="Spieler:innen auswählen">
+              <div className="player-picker-heading">
+                <span>Spielerauswahl</span>
+                <strong>{activePlayers.length} / 3 gewählt</strong>
+              </div>
+              {playersLoading ? <p className="picker-note">Spielerliste wird geladen …</p> : availablePlayers.length ? (
+                <div className="player-picker-grid">
+                  {availablePlayers.map((candidate) => {
+                    const selected = activePlayers.some(
+                      (player) => player.firstName.localeCompare(candidate.firstName, "de", { sensitivity: "base" }) === 0,
+                    );
+                    const disabled = !selected && activePlayers.length >= 3;
+                    return (
+                      <button
+                        className={`player-choice${selected ? " selected" : ""}`}
+                        key={candidate.id}
+                        type="button"
+                        disabled={disabled}
+                        aria-pressed={selected}
+                        onClick={() => togglePlayer(candidate)}
+                      >
+                        <PlayerAvatar firstName={candidate.firstName} size={72} />
+                        <strong>{candidate.firstName}</strong>
+                        <span>{selected ? "Ausgewählt" : "Auswählen"}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-              </form>
-                ) : (
-              <p className="limit-note">3 / 3 Plätze belegt</p>
-                )}
+              ) : <p className="picker-note">Noch keine Spieler:innen vorhanden. Bitte zuerst im Tab „Team“ ergänzen.</p>}
+            </div>
                 {message && <p className="form-message" role="status">{message}</p>}
           </div>
         )}
