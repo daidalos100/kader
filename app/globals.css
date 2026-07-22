@@ -502,6 +502,13 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .roster-form button:disabled { opacity: .4; cursor: default; }
 .empty-roster { padding: 38px; border: 1px solid rgba(244,243,239,.14); background: #101115; text-align: center; }
 .empty-roster p { color: #8f9197; }
+.empty-roster.compact { margin-bottom: 18px; padding: 22px; }
+.position-filter-bar { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 20px; padding: 12px 0; border-top: 1px solid rgba(244,243,239,.12); border-bottom: 1px solid rgba(244,243,239,.12); }
+.position-filters { display: flex; gap: 6px; min-width: 0; overflow-x: auto; padding: 2px; scrollbar-width: thin; }
+.position-filters button { flex: 0 0 auto; min-height: 38px; padding: 0 13px; border: 1px solid rgba(244,243,239,.14); background: transparent; color: #85878d; font-size: .58rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.position-filters button:hover { border-color: rgba(239,22,28,.65); color: var(--white); }
+.position-filters button.active { border-color: var(--red); background: rgba(239,22,28,.14); color: var(--white); }
+.position-filter-bar > span { flex: 0 0 auto; color: #85878d; font-size: .61rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
 .history-panel { margin-top: 54px; border: 1px solid rgba(244,243,239,.12); background: rgba(16,17,21,.56); }
 .history-summary { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 76px; padding: 16px 18px; }
 .history-summary > div { display: grid; gap: 6px; }
@@ -556,6 +563,8 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
   .event-detail { min-height: 0; }
   .empty-detail { min-height: 220px; }
   .player-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .position-filter-bar { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .position-filters { width: 100%; }
   .fc-card, .fc-card-inner { min-height: 550px; }
   .setup-banner { align-items: flex-start; flex-direction: column; }
 }

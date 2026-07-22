@@ -20,6 +20,8 @@ test("mobile and accessibility safeguards stay present", async () => {
   }
   assert.ok(component.includes("Verlauf öffnen"));
   assert.ok(component.includes("aria-expanded={open}"));
+  assert.ok(component.includes('aria-label="Teamkarten nach Position filtern"'));
+  assert.ok(component.includes("player.secondaryPosition === positionFilter"));
 });
 
 test("security and conflict controls stay present", async () => {

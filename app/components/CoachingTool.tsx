@@ -98,6 +98,7 @@ export default function CoachingTool() {
   const [migrationRequired, setMigrationRequired] = useState(false);
   const [notice, setNotice] = useState("");
   const [newRosterName, setNewRosterName] = useState("");
+  const [positionFilter, setPositionFilter] = useState("all");
   const [referenceTime] = useState(() => Date.now());
 
   const profiles = useMemo(
@@ -282,6 +283,18 @@ export default function CoachingTool() {
     });
     return { player, appearances, goals, assists, participation: recorded ? Math.round((present / recorded) * 100) : null };
   });
+  const sortedCardRows = [...statsRows]
+    .filter(({ player }) => positionFilter === "all"
+      || (positionFilter === "unassigned" && !player.primaryPosition && !player.secondaryPosition)
+      || player.primaryPosition === positionFilter
+      || player.secondaryPosition === positionFilter)
+    .sort((a, b) => {
+      const aRank = positionOptions.indexOf(a.player.primaryPosition);
+      const bRank = positionOptions.indexOf(b.player.primaryPosition);
+      const rankDifference = (aRank < 0 ? positionOptions.length : aRank) - (bRank < 0 ? positionOptions.length : bRank);
+      return rankDifference || a.player.firstName.localeCompare(b.player.firstName, "de");
+    });
+  const hasUnassignedPlayers = profiles.some((player) => !player.primaryPosition && !player.secondaryPosition);
 
   return (
     <main className="coach-shell">
@@ -369,8 +382,17 @@ export default function CoachingTool() {
             <section className="coach-view">
               <div className="view-heading compact team-heading"><div><p className="section-index">SPIELERPROFILE</p><h1>Teamkarten.</h1><p>Karte anklicken, um zwischen Profil und Leistungsseite zu wechseln.</p></div><form className="roster-form" onSubmit={addRosterPlayer}><label htmlFor="roster-name">Spieler:in ergänzen</label><div><input id="roster-name" value={newRosterName} onChange={(event) => setNewRosterName(event.target.value)} placeholder="Vorname" maxLength={30} /><button type="submit" disabled={!newRosterName.trim()}>Hinzufügen</button></div></form></div>
               {!profiles.length && <div className="empty-roster"><strong>Noch keine Spieler:innen im Team.</strong><p>Oben einen Vornamen ergänzen oder zuerst Namen in der allgemeinen Aufstellung eintragen.</p></div>}
+              {!!profiles.length && <div className="position-filter-bar">
+                <div className="position-filters" role="group" aria-label="Teamkarten nach Position filtern">
+                  {[{ value: "all", label: "Alle" }, ...positionOptions.map((position) => ({ value: position, label: position })), ...(hasUnassignedPlayers ? [{ value: "unassigned", label: "Ohne Position" }] : [])].map((filter) => (
+                    <button key={filter.value} type="button" className={positionFilter === filter.value ? "active" : ""} aria-pressed={positionFilter === filter.value} onClick={() => setPositionFilter(filter.value)}>{filter.label}</button>
+                  ))}
+                </div>
+                <span>{sortedCardRows.length} Spieler</span>
+              </div>}
+              {!!profiles.length && !sortedCardRows.length && <div className="empty-roster compact"><strong>Keine Spieler für diese Position.</strong><p>Der Filter berücksichtigt Haupt- und Ersatzposition.</p></div>}
               <div className="player-card-grid">
-                {statsRows.map(({ player, appearances, goals, assists, participation }) => {
+                {sortedCardRows.map(({ player, appearances, goals, assists, participation }) => {
                   const history = state.diagnostics[player.id] ?? [];
                   return <PlayerCard key={player.id} profile={player} flipped={Boolean(flipped[player.id])} appearances={appearances} goals={goals} assists={assists} participation={participation} history={history} onFlip={() => setFlipped((current) => ({ ...current, [player.id]: !current[player.id] }))} onEdit={() => setEditingProfile(player)} onDiagnostic={() => setDiagnosticPlayer(player)} />;
                 })}
