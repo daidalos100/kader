@@ -58,7 +58,6 @@ function createPlayerId() {
 function PlayerAvatar({ firstName, size = 28 }: { firstName: string; size?: number }) {
   const [visible, setVisible] = useState(true);
 
-  useEffect(() => setVisible(true), [firstName]);
   if (!visible) return null;
 
   return (
@@ -146,7 +145,15 @@ function SortablePlayer({
   );
 }
 
-export default function SquadPlanner() {
+export default function SquadPlanner({
+  embedded = false,
+  lineupId = "default",
+  eventTitle,
+}: {
+  embedded?: boolean;
+  lineupId?: string;
+  eventTitle?: string;
+}) {
   const [lineup, setLineup] = useState<Lineup>(emptyLineup);
   const [activePosition, setActivePosition] = useState<Position | null>(null);
   const [newName, setNewName] = useState("");
@@ -163,7 +170,7 @@ export default function SquadPlanner() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/lineup", { cache: "no-store" })
+    fetch(`/api/lineup?lineupId=${encodeURIComponent(lineupId)}`, { cache: "no-store" })
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Aufstellung konnte nicht geladen werden.");
@@ -178,7 +185,7 @@ export default function SquadPlanner() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [lineupId]);
 
   useEffect(() => {
     if (activePosition && dialogRef.current && !dialogRef.current.open) {
@@ -215,7 +222,7 @@ export default function SquadPlanner() {
       const response = await fetch("/api/lineup", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ positionId, players }),
+        body: JSON.stringify({ lineupId, positionId, players }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Speichern fehlgeschlagen.");
@@ -283,8 +290,8 @@ export default function SquadPlanner() {
   }
 
   return (
-    <main className="app-shell">
-      <header className="site-header">
+    <div className={embedded ? "lineup-module" : "app-shell"}>
+      {!embedded && <header className="site-header">
         <div className="brand-lockup">
           <Image src="/brand/tsg-logo.png" alt="TSG Tübingen" width={92} height={92} priority unoptimized />
           <div>
@@ -302,12 +309,12 @@ export default function SquadPlanner() {
           unoptimized
         />
         <button className="logout-button" type="button" onClick={logout}>Abmelden</button>
-      </header>
+      </header>}
 
       <section className="planner-intro" aria-labelledby="planner-heading">
         <div>
-          <p className="section-index">01 / AUFSTELLUNG</p>
-          <h2 id="planner-heading">Die Mannschaft. 2026/27</h2>
+          <p className="section-index">{eventTitle ? "TERMIN-AUFSTELLUNG" : "01 / AUFSTELLUNG"}</p>
+          <h2 id="planner-heading">{eventTitle || "Die Mannschaft. 2026/27"}</h2>
           <p>Position anklicken, bis zu drei Vornamen eintragen und die Reihenfolge per Drag-and-drop festlegen.</p>
         </div>
         <div className="stats" aria-label="Status der Aufstellung">
@@ -431,6 +438,6 @@ export default function SquadPlanner() {
           </div>
         )}
       </dialog>
-    </main>
+    </div>
   );
 }

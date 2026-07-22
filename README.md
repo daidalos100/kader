@@ -1,4 +1,25 @@
-# vinext-starter
+# TSG Tübingen D1 · Coaching Tool
+
+Traineroberfläche für Kalender, terminbezogene Kaderplanung, Trainingsanwesenheit,
+Spielstatistik, Spielerprofile und Leistungsdiagnostik. Der öffentliche D1-Google-
+Kalender wird automatisch gelesen; geschützte Daten werden serverseitig in Supabase
+gespeichert.
+
+## Einmalige Supabase-Einrichtung für Phase 2
+
+Die Datei `supabase/phase2.sql` einmal im SQL Editor des bestehenden Supabase-Projekts
+ausführen. Sie ergänzt ausschließlich die Phase-2-Tabelle und verändert weder die
+vorhandene Aufstellung noch die Spielerbilder.
+
+Erforderliche Laufzeitvariablen:
+
+- `EDIT_PIN`
+- `SUPABASE_URL`
+- `SUPABASE_SECRET_KEY`
+
+Die Werte dürfen nur in der Hosting-Umgebung liegen und gehören nicht ins Repository.
+
+## Technische Basis
 
 A clean full-stack starter running on
 [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and

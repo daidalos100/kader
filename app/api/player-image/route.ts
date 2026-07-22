@@ -1,10 +1,5 @@
 import { isAuthenticated } from "../../auth";
 
-type RuntimeEnv = {
-  SUPABASE_URL?: string;
-  SUPABASE_SECRET_KEY?: string;
-};
-
 function slugify(value: string) {
   return value
     .normalize("NFD")

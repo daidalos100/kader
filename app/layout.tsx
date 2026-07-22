@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TSG Kaderplaner",
-  description: "Die Aufstellung für das TSG Fußball-Neunerfeld planen.",
+  title: "TSG Tübingen D1 · Coaching Tool",
+  description: "Kalender, Kaderplanung, Anwesenheit und Statistik der TSG Tübingen D1.",
   other: {
     "codex-preview": "development",
   },

@@ -1,39 +1,13 @@
 export const dynamic = "force-dynamic";
 
 import { isAuthenticated } from "../../auth";
+import { getSupabaseConfig, supabaseHeaders } from "../../lib/supabase";
 
 type Player = { id: string; firstName: string };
-type RuntimeEnv = {
-  SUPABASE_URL?: string;
-  SUPABASE_SECRET_KEY?: string;
-  SUPABASE_PUBLISHABLE_KEY?: string;
-};
-
 const positionIds = new Set(["st", "lf", "rf", "zm", "zdm", "lv", "iv", "rv", "tw"]);
 
-async function config() {
-  const nodeRuntime = process.env as RuntimeEnv;
-  if (nodeRuntime.SUPABASE_URL || nodeRuntime.SUPABASE_SECRET_KEY || nodeRuntime.SUPABASE_PUBLISHABLE_KEY) {
-    return {
-      url: nodeRuntime.SUPABASE_URL?.trim().replace(/\/$/, ""),
-      key: (nodeRuntime.SUPABASE_SECRET_KEY ?? nodeRuntime.SUPABASE_PUBLISHABLE_KEY)?.trim(),
-    };
-  }
-
-  const cloudflare = await import("cloudflare:workers");
-  const runtime = cloudflare.env as unknown as RuntimeEnv;
-  const url = runtime.SUPABASE_URL?.trim().replace(/\/$/, "");
-  const key = (runtime.SUPABASE_SECRET_KEY ?? runtime.SUPABASE_PUBLISHABLE_KEY)?.trim();
-  return { url, key };
-}
-
-function headers(key: string, extra?: Record<string, string>) {
-  return {
-    apikey: key,
-    ...(key.startsWith("sb_") ? {} : { authorization: `Bearer ${key}` }),
-    "content-type": "application/json",
-    ...extra,
-  };
+function validLineupId(value: string) {
+  return value === "default" || /^event-[a-zA-Z0-9._:-]{8,220}$/.test(value);
 }
 
 function validPlayers(value: unknown): value is Player[] {
@@ -50,19 +24,22 @@ function validPlayers(value: unknown): value is Player[] {
   });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!(await isAuthenticated())) {
     return Response.json({ error: "Nicht angemeldet." }, { status: 401 });
   }
-  const supabase = await config();
+  const lineupId = new URL(request.url).searchParams.get("lineupId") ?? "default";
+  if (!validLineupId(lineupId)) return Response.json({ error: "Ungültige Aufstellung." }, { status: 400 });
+
+  const supabase = await getSupabaseConfig();
   if (!supabase.url || !supabase.key) {
     return Response.json({ lineup: {}, connected: false });
   }
 
   try {
     const response = await fetch(
-      `${supabase.url}/rest/v1/lineup_positions?select=position_id,players&lineup_id=eq.default`,
-      { headers: headers(supabase.key), cache: "no-store" },
+      `${supabase.url}/rest/v1/lineup_positions?select=position_id,players&lineup_id=eq.${encodeURIComponent(lineupId)}`,
+      { headers: supabaseHeaders(supabase.key), cache: "no-store" },
     );
 
     if (!response.ok) {
@@ -89,12 +66,16 @@ export async function PATCH(request: Request) {
   if (!(await isAuthenticated())) {
     return Response.json({ error: "Nicht angemeldet." }, { status: 401 });
   }
-  const supabase = await config();
+  const supabase = await getSupabaseConfig();
   if (!supabase.url || !supabase.key) {
     return Response.json({ connected: false });
   }
   try {
-    const payload = (await request.json()) as { positionId?: unknown; players?: unknown };
+    const payload = (await request.json()) as { lineupId?: unknown; positionId?: unknown; players?: unknown };
+    const lineupId = typeof payload.lineupId === "string" ? payload.lineupId : "default";
+    if (!validLineupId(lineupId)) {
+      return Response.json({ error: "Ungültige Aufstellung." }, { status: 400 });
+    }
     if (typeof payload.positionId !== "string" || !positionIds.has(payload.positionId)) {
       return Response.json({ error: "Unbekannte Position." }, { status: 400 });
     }
@@ -108,11 +89,11 @@ export async function PATCH(request: Request) {
     }));
     const response = await fetch(`${supabase.url}/rest/v1/lineup_positions?on_conflict=lineup_id,position_id`, {
       method: "POST",
-      headers: headers(supabase.key, {
+      headers: supabaseHeaders(supabase.key, {
         prefer: "resolution=merge-duplicates,return=minimal",
       }),
       body: JSON.stringify({
-        lineup_id: "default",
+        lineup_id: lineupId,
         position_id: payload.positionId,
         players,
         updated_at: new Date().toISOString(),
