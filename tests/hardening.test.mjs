@@ -18,6 +18,8 @@ test("mobile and accessibility safeguards stay present", async () => {
   for (const marker of ["aria-live=\"polite\"", "<dialog", "aria-labelledby", "role=\"status\""]) {
     assert.ok(component.includes(marker), `missing ${marker}`);
   }
+  assert.ok(component.includes("Verlauf öffnen"));
+  assert.ok(component.includes("aria-expanded={open}"));
 });
 
 test("security and conflict controls stay present", async () => {

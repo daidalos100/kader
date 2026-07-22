@@ -412,27 +412,34 @@ function historyLabel(entry: HistoryEntry) {
 
 function HistoryPanel({ onRestored }: { onRestored: () => Promise<void> }) {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
+  const [open, setOpen] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function load() {
-    const response = await fetch("/api/history", { cache: "no-store" });
-    const data = await response.json() as { history?: HistoryEntry[]; error?: string };
-    if (!response.ok) throw new Error(data.error ?? "Verlauf konnte nicht geladen werden.");
-    setEntries(data.history ?? []);
+    setLoading(true);
+    try {
+      const response = await fetch("/api/history", { cache: "no-store" });
+      const data = await response.json() as { history?: HistoryEntry[]; error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Verlauf konnte nicht geladen werden.");
+      setEntries(data.history ?? []);
+      setLoaded(true);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/history", { cache: "no-store" })
-      .then(async (response) => {
-        const data = await response.json() as { history?: HistoryEntry[]; error?: string };
-        if (!response.ok) throw new Error(data.error ?? "Verlauf konnte nicht geladen werden.");
-        if (!cancelled) setEntries(data.history ?? []);
-      })
-      .catch((reason: Error) => { if (!cancelled) setError(reason.message); });
-    return () => { cancelled = true; };
-  }, []);
+  async function toggle() {
+    const nextOpen = !open;
+    setOpen(nextOpen);
+    setError("");
+    if (nextOpen && !loaded) {
+      try { await load(); }
+      catch (reason) { setError(reason instanceof Error ? reason.message : "Verlauf konnte nicht geladen werden."); }
+    }
+  }
 
   async function restore(entry: HistoryEntry) {
     if (!window.confirm("Diesen Eintrag auf den unmittelbar vorherigen Stand zurücksetzen?")) return;
@@ -449,12 +456,20 @@ function HistoryPanel({ onRestored }: { onRestored: () => Promise<void> }) {
     } finally { setBusy(false); }
   }
 
-  return <section className="history-panel" aria-labelledby="history-title">
-    <div className="section-heading"><div><p className="section-index">SICHERUNG &amp; VERLAUF</p><h2 id="history-title">Letzte Änderungen</h2></div><a className="text-button" href="/api/backup" download>Backup herunterladen ↓</a></div>
-    {error && <p className="coach-notice" role="status">{error}</p>}
-    {!entries.length && !error ? <p className="history-empty">Noch keine Änderungen im neuen Verlauf.</p> : <ol className="history-list">
-      {entries.slice(0, 10).map((entry) => <li key={entry.id}><div><strong>{historyLabel(entry)}</strong><time dateTime={entry.changed_at}>{new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" }).format(new Date(entry.changed_at))}</time></div><button type="button" disabled={busy} onClick={() => void restore(entry)}>Rückgängig</button></li>)}
-    </ol>}
+  return <section className={`history-panel${open ? " open" : ""}`} aria-labelledby="history-title">
+    <div className="history-summary">
+      <div><p className="section-index" id="history-title">SICHERUNG &amp; VERLAUF</p><p>Änderungen und Backups bei Bedarf öffnen.</p></div>
+      <button className="history-toggle" type="button" aria-expanded={open} aria-controls="history-content" onClick={() => void toggle()}>
+        {open ? "Verlauf schließen" : "Verlauf öffnen"}<span aria-hidden="true">{open ? "↑" : "↓"}</span>
+      </button>
+    </div>
+    {open && <div className="history-content" id="history-content">
+      <div className="history-content-head"><h2>Letzte Änderungen</h2><a className="text-button" href="/api/backup" download>Backup herunterladen ↓</a></div>
+      {error && <p className="coach-notice" role="status">{error}</p>}
+      {loading ? <p className="history-empty" role="status">Verlauf wird geladen …</p> : !entries.length && !error ? <p className="history-empty">Noch keine Änderungen im neuen Verlauf.</p> : <ol className="history-list">
+        {entries.slice(0, 10).map((entry) => <li key={entry.id}><div><strong>{historyLabel(entry)}</strong><time dateTime={entry.changed_at}>{new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" }).format(new Date(entry.changed_at))}</time></div><button type="button" disabled={busy} onClick={() => void restore(entry)}>Rückgängig</button></li>)}
+      </ol>}
+    </div>}
   </section>;
 }
 
