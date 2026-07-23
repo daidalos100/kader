@@ -595,6 +595,8 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
 .match-editor select:focus, .match-panel input:focus, .coach-modal input:focus, .coach-modal select:focus, .coach-modal textarea:focus { border-color: var(--red); }
 .match-panel { margin-top: 30px; }
 .match-panel h2 { margin: 8px 0 20px; font-size: 1.5rem; line-height: 1.05; text-transform: uppercase; }
+.match-statistic-note { margin: 18px 0 0; color: #aeb0b6; font-size: .78rem; line-height: 1.55; }
+.match-statistic-note strong { color: var(--white); }
 .match-player-list { display: grid; gap: 5px; max-height: 530px; margin-top: 18px; overflow-y: auto; }
 .match-player-list > div { display: grid; grid-template-columns: 1fr 76px 76px; gap: 7px; align-items: end; padding: 8px; border: 1px solid rgba(244,243,239,.1); }
 .match-player-list label { display: grid; gap: 5px; color: #7f8187; font-size: .55rem; text-transform: uppercase; }
