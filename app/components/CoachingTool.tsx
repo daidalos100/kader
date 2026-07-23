@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import SquadPlanner from "./SquadPlanner";
-import TacticsBoard, { TacticLayout } from "./TacticsBoard";
+import TacticsBoard, { CustomTactic, TacticEntry, TacticLayout, TacticTemplate } from "./TacticsBoard";
 import type { CalendarEvent } from "../lib/calendar";
 
 type Tab = "overview" | "calendar" | "lineup" | "tactics" | "players" | "stats";
@@ -35,7 +35,7 @@ type CoachingState = {
   attendance: Record<string, Record<string, AttendanceStatus>>;
   matches: Record<string, MatchData>;
   diagnostics: Record<string, Diagnostic[]>;
-  tactics: Record<string, TacticLayout>;
+  tactics: Record<string, TacticEntry>;
 };
 type SaveOperation = { scope: string; key: string; value: unknown; expectedRevision: number };
 type HistoryEntry = { id: number; scope: string; record_key: string; revision: number; changed_at: string; changed_by: string };
@@ -60,8 +60,23 @@ function normalizeState(value: unknown, fallbackRoster: string[] = []): Coaching
   return {
     roster: Array.isArray(state.roster) && state.roster.length ? state.roster : fallbackRoster,
     profiles: state.profiles ?? {}, attendance: state.attendance ?? {}, matches: state.matches ?? {},
-    diagnostics: state.diagnostics ?? {}, tactics: state.tactics ?? {},
+    diagnostics: state.diagnostics ?? {}, tactics: normalizeTactics(state.tactics),
   };
+}
+
+function normalizeTactics(value: unknown): Record<string, TacticEntry> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const result: Record<string, TacticEntry> = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const item = entry as Record<string, unknown>;
+    if (item.layout && typeof item.layout === "object" && typeof item.name === "string" && typeof item.id === "string") {
+      if (!item.deleted) result[key] = item as unknown as CustomTactic;
+    } else if (item.positions && item.ball) {
+      result[key] = item as unknown as TacticLayout;
+    }
+  }
+  return result;
 }
 
 function formatDate(value: string, withTime = true) {
@@ -274,10 +289,47 @@ export default function CoachingTool() {
     window.location.assign("/login");
   }
 
-  async function saveTactic(scenario: "attack" | "defense" | "corner", layout: TacticLayout) {
-    const next = { ...state, tactics: { ...state.tactics, [scenario]: layout } };
-    const saved = await save(next, [operation("tactic", scenario, layout)]);
+  async function saveTactic(scenario: string, layout: TacticLayout) {
+    const current = state.tactics[scenario];
+    const value: TacticEntry = current && "layout" in current ? { ...current, layout, deleted: false } : layout;
+    const next = { ...state, tactics: { ...state.tactics, [scenario]: value } };
+    const saved = await save(next, [operation("tactic", scenario, value)]);
     if (!saved) throw new Error("Taktik konnte nicht gespeichert werden.");
+  }
+
+  function newTacticId() {
+    return `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+  }
+
+  async function createTactic(name: string, baseScenario: TacticTemplate, layout: TacticLayout) {
+    const id = newTacticId();
+    const value: CustomTactic = { id, name, layout, baseScenario, createdAt: new Date().toISOString() };
+    const next = { ...state, tactics: { ...state.tactics, [id]: value } };
+    if (!await save(next, [operation("tactic", id, value)])) throw new Error("Taktik konnte nicht angelegt werden.");
+    return id;
+  }
+
+  async function renameTactic(id: string, name: string) {
+    const current = state.tactics[id];
+    if (!current || !("layout" in current)) return;
+    const value = { ...current, name, deleted: false };
+    if (!await save({ ...state, tactics: { ...state.tactics, [id]: value } }, [operation("tactic", id, value)])) throw new Error("Taktik konnte nicht umbenannt werden.");
+  }
+
+  async function duplicateTactic(id: string, layout: TacticLayout) {
+    const current = state.tactics[id];
+    if (!current || !("layout" in current)) throw new Error("Taktik konnte nicht dupliziert werden.");
+    const newId = newTacticId();
+    const value: CustomTactic = { ...current, id: newId, name: `${current.name} Kopie`.slice(0, 40), layout, createdAt: new Date().toISOString(), deleted: false };
+    if (!await save({ ...state, tactics: { ...state.tactics, [newId]: value } }, [operation("tactic", newId, value)])) throw new Error("Taktik konnte nicht dupliziert werden.");
+    return newId;
+  }
+
+  async function deleteTactic(id: string) {
+    const current = state.tactics[id];
+    if (!current || !("layout" in current)) return;
+    const value = { ...current, deleted: true };
+    if (!await save({ ...state, tactics: { ...state.tactics, [id]: value } }, [operation("tactic", id, value)])) throw new Error("Taktik konnte nicht gelöscht werden.");
   }
 
   const statsRows = profiles.map((player) => {
@@ -398,6 +450,10 @@ export default function CoachingTool() {
                 eventTitle={nextGame ? `${nextGame.title} · ${formatDate(nextGame.start, false)}` : "Allgemeine Aufstellung"}
                 tactics={state.tactics}
                 onSave={saveTactic}
+                onCreate={createTactic}
+                onRename={renameTactic}
+                onDuplicate={duplicateTactic}
+                onDelete={deleteTactic}
               />
             </section>
           )}
@@ -558,3 +614,4 @@ function DiagnosticDialog({ profile, onClose, onSubmit }: { profile: Profile; on
   useEffect(() => { const dialog = dialogRef.current; dialog?.showModal(); return () => dialog?.close(); }, []);
   return <dialog ref={dialogRef} className="modal-backdrop" aria-labelledby="diagnostic-dialog-title" onCancel={(e) => { e.preventDefault(); onClose(); }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><form className="coach-modal" onSubmit={onSubmit}><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">LEISTUNGSDIAGNOSTIK</p><h2 id="diagnostic-dialog-title">{profile.firstName}</h2><div className="form-grid diagnostic-form"><label>Datum<input autoFocus name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></label><span /><label>Sprint 5 m (Sek.)<input name="sprint5" inputMode="decimal" /></label><label>Sprint 10 m (Sek.)<input name="sprint10" inputMode="decimal" /></label><label>Sprint 20 m (Sek.)<input name="sprint20" inputMode="decimal" /></label><label>Agility (Sek.)<input name="agility" inputMode="decimal" /></label><label>Ausdauerwert<input name="endurance" inputMode="decimal" /></label><label>Sprungkraft (cm)<input name="jump" inputMode="decimal" /></label></div><button className="primary-button" type="submit">Messung speichern</button></form></dialog>;
 }
+
