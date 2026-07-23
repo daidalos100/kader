@@ -41,6 +41,7 @@ type Diagnostic = {
 };
 type DiagnosticMetric = { attempts: Array<number | string | null>; best: number | null; percentile: number | null; category: string | null; rating: string | null };
 type DiagnosticDisciplineKey = "sprint10" | "sprint20" | "agility" | "dribbling" | "shuttleRun" | "jump";
+type SeasonStatKey = "appearances" | "training" | "goals" | "assists";
 type CoachingState = {
   roster: string[];
   profiles: Record<string, Partial<Profile>>;
@@ -359,6 +360,17 @@ export default function CoachingTool() {
     });
     return { player, appearances, goals, assists, participation: recorded ? Math.round((present / recorded) * 100) : null };
   });
+  const seasonStatBestByPlayer = useMemo(() => {
+    const keys: SeasonStatKey[] = ["appearances", "training", "goals", "assists"];
+    const winners: Record<string, Set<SeasonStatKey>> = {};
+    keys.forEach((key) => {
+      const values = statsRows.map((row) => ({ playerId: row.player.id, value: key === "training" ? row.participation : row[key] })).filter((item): item is { playerId: string; value: number } => typeof item.value === "number" && Number.isFinite(item.value));
+      if (!values.length) return;
+      const best = Math.max(...values.map((item) => item.value));
+      values.filter((item) => item.value === best && best > 0).forEach((item) => { (winners[item.playerId] ??= new Set()).add(key); });
+    });
+    return winners;
+  }, [statsRows]);
   const sortedCardRows = [...statsRows]
     .filter(({ player }) => positionFilter === "all"
       || (positionFilter === "unassigned" && !player.primaryPosition && !player.secondaryPosition)
@@ -510,7 +522,7 @@ export default function CoachingTool() {
               <div className="player-card-grid">
                 {sortedCardRows.map(({ player, appearances, goals, assists, participation }) => {
                   const history = state.diagnostics[player.id] ?? [];
-                  return <PlayerCard key={player.id} profile={player} flipped={Boolean(flipped[player.id])} appearances={appearances} goals={goals} assists={assists} participation={participation} history={history} bestDisciplineKeys={diagnosticBestByPlayer[player.id] ?? new Set()} onFlip={() => setFlipped((current) => ({ ...current, [player.id]: !current[player.id] }))} onEdit={() => setEditingProfile(player)} onDetails={() => setDetailPlayer(player)} />;
+                  return <PlayerCard key={player.id} profile={player} flipped={Boolean(flipped[player.id])} appearances={appearances} goals={goals} assists={assists} participation={participation} bestSeasonStatKeys={seasonStatBestByPlayer[player.id] ?? new Set()} history={history} bestDisciplineKeys={diagnosticBestByPlayer[player.id] ?? new Set()} onFlip={() => setFlipped((current) => ({ ...current, [player.id]: !current[player.id] }))} onEdit={() => setEditingProfile(player)} onDetails={() => setDetailPlayer(player)} />;
                 })}
               </div>
             </section>
@@ -621,8 +633,19 @@ function AttendancePanel({ event, profiles, attendance, onSet, onAll }: { event:
   return <><div className="detail-head"><div><p className="section-index">TRAININGSTEILNAHME</p><h2>{event.title}</h2><p>{formatDate(event.start)}</p></div><button className="text-button" onClick={() => onAll(event.id)}>Alle anwesend</button></div><div className="attendance-list">{profiles.map((player) => <div className="attendance-row" key={player.id}><div><Image src={`/api/player-image?name=${encodeURIComponent(player.firstName)}`} alt="" width={38} height={38} unoptimized /><strong>{player.firstName}</strong></div><div className="attendance-options">{(["present", "excused", "absent"] as AttendanceStatus[]).map((status) => <button key={status} className={`${status}${attendance[player.id] === status ? " selected" : ""}`} onClick={() => onSet(event.id, player.id, status)} aria-label={`${player.firstName}: ${{ present: "anwesend", excused: "entschuldigt", absent: "abwesend" }[status]}`}><span />{{ present: "Anwesend", excused: "Entschuldigt", absent: "Abwesend" }[status]}</button>)}</div></div>)}</div></>;
 }
 
-function PlayerCard({ profile, flipped, appearances, goals, assists, participation, history, bestDisciplineKeys, onFlip, onEdit, onDetails }: { profile: Profile; flipped: boolean; appearances: number; goals: number; assists: number; participation: number | null; history: Diagnostic[]; bestDisciplineKeys: Set<DiagnosticDisciplineKey>; onFlip: () => void; onEdit: () => void; onDetails: () => void }) {
-  return <article className={`fc-card${flipped ? " flipped" : ""}`}><div className="fc-card-inner"><div className="fc-face fc-front"><button className="card-flip-area" onClick={onFlip} aria-label={`${profile.firstName}: Leistungsseite anzeigen`}><div className="shirt-number">{profile.shirtNumber || "—"}</div><Image src={`/api/player-image?name=${encodeURIComponent(profile.firstName)}`} alt={profile.firstName} width={260} height={260} unoptimized /><div className="fc-name">{profile.firstName}</div><div className="fc-positions"><strong>{profile.primaryPosition || "POS"}</strong><span>{profile.secondaryPosition || "—"}</span></div><div className="fc-foot">Starker Fuß <strong>{{ left: "Links", right: "Rechts", both: "Beide", "": "—" }[profile.strongFoot]}</strong></div><p>{profile.personality || "Spielerpersönlichkeit noch nicht ergänzt."}</p></button><button className="card-edit" onClick={onEdit}>Profil bearbeiten</button></div><div className="fc-face fc-back"><button className="card-flip-area" onClick={onFlip} aria-label={`${profile.firstName}: Profilseite anzeigen`}><p className="section-index">SAISONWERTE</p><h3>{profile.firstName}</h3><div className="fc-metrics"><div><strong>{appearances}</strong><span>Einsätze</span></div><div><strong>{goals}</strong><span>Tore</span></div><div><strong>{assists}</strong><span>Assists</span></div><div><strong>{participation === null ? "—" : `${participation}%`}</strong><span>Training</span></div></div><DiagnosticOverview latest={history[0]} bestDisciplineKeys={bestDisciplineKeys} /></button><button className="card-edit" onClick={onDetails}>Details ansehen</button></div></div></article>;
+function seasonStatus(key: SeasonStatKey, value: number | null): "good" | "average" | "critical" | "neutral" {
+  if (value === null) return "neutral";
+  if (key === "training") return value >= 80 ? "good" : value >= 60 ? "average" : "critical";
+  return value > 0 ? "good" : "neutral";
+}
+
+function SeasonMetric({ label, value, keyName, best }: { label: string; value: string | number; keyName: SeasonStatKey; best: boolean }) {
+  const numeric = typeof value === "number" ? value : value === "—" ? null : Number.parseFloat(value);
+  return <div className="season-metric"><div className="season-metric-value"><span className={`diagnostic-dot ${seasonStatus(keyName, Number.isFinite(numeric) ? numeric : null)}`} aria-hidden="true" /><strong>{value}</strong>{best && <span className="diagnostic-crown" title="Bester Wert im Team" aria-label="Bester Wert im Team">👑</span>}</div><span>{label}</span></div>;
+}
+
+function PlayerCard({ profile, flipped, appearances, goals, assists, participation, bestSeasonStatKeys, history, bestDisciplineKeys, onFlip, onEdit, onDetails }: { profile: Profile; flipped: boolean; appearances: number; goals: number; assists: number; participation: number | null; bestSeasonStatKeys: Set<SeasonStatKey>; history: Diagnostic[]; bestDisciplineKeys: Set<DiagnosticDisciplineKey>; onFlip: () => void; onEdit: () => void; onDetails: () => void }) {
+  return <article className={`fc-card${flipped ? " flipped" : ""}`}><div className="fc-card-inner"><div className="fc-face fc-front"><button type="button" className="card-flip-area" onClick={onFlip} aria-label={`${profile.firstName}: Leistungsseite anzeigen`}><div className="shirt-number">{profile.shirtNumber || "—"}</div><Image src={`/api/player-image?name=${encodeURIComponent(profile.firstName)}`} alt={profile.firstName} width={260} height={260} unoptimized /><div className="fc-name">{profile.firstName}</div><div className="fc-positions"><strong>{profile.primaryPosition || "POS"}</strong><span>{profile.secondaryPosition || "—"}</span></div><div className="fc-foot">Starker Fuß <strong>{{ left: "Links", right: "Rechts", both: "Beide", "": "—" }[profile.strongFoot]}</strong></div><p>{profile.personality || "Spielerpersönlichkeit noch nicht ergänzt."}</p></button><button type="button" className="card-edit" onClick={(event) => { event.stopPropagation(); onEdit(); }}>Profil bearbeiten</button></div><div className="fc-face fc-back"><button type="button" className="card-flip-area" onClick={onFlip} aria-label={`${profile.firstName}: Profilseite anzeigen`}><p className="section-index">SAISONWERTE</p><h3>{profile.firstName}</h3><div className="fc-metrics"><SeasonMetric label="Einsätze" value={appearances} keyName="appearances" best={bestSeasonStatKeys.has("appearances")} /><SeasonMetric label="Training" value={participation === null ? "—" : `${participation}%`} keyName="training" best={bestSeasonStatKeys.has("training")} /><SeasonMetric label="Tore" value={goals} keyName="goals" best={bestSeasonStatKeys.has("goals")} /><SeasonMetric label="Assists" value={assists} keyName="assists" best={bestSeasonStatKeys.has("assists")} /></div><DiagnosticOverview latest={history[0]} bestDisciplineKeys={bestDisciplineKeys} /></button><button type="button" className="card-edit diagnostic-details-button" onClick={(event) => { event.stopPropagation(); onDetails(); }}>Details ansehen</button></div></div></article>;
 }
 
 type DiagnosticStatus = "good" | "mid-good" | "average" | "below" | "critical" | "bad" | "neutral";
@@ -690,8 +713,10 @@ function ProfileDialog({ profile, onClose, onSubmit }: { profile: Profile; onClo
 }
 
 function DiagnosticDialog({ profile, onClose, onSubmit }: { profile: Profile; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  useEffect(() => { const dialog = dialogRef.current; dialog?.showModal(); return () => dialog?.close(); }, []);
-  return <dialog ref={dialogRef} className="modal-backdrop" aria-labelledby="diagnostic-dialog-title" onCancel={(e) => { e.preventDefault(); onClose(); }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><form className="coach-modal" onSubmit={onSubmit}><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">LEISTUNGSDIAGNOSTIK</p><h2 id="diagnostic-dialog-title">{profile.firstName}</h2><div className="form-grid diagnostic-form"><label>Datum<input autoFocus name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></label><span /><label>Sprint 5 m (Sek.)<input name="sprint5" inputMode="decimal" /></label><label>Sprint 10 m (Sek.)<input name="sprint10" inputMode="decimal" /></label><label>Sprint 20 m (Sek.)<input name="sprint20" inputMode="decimal" /></label><label>Agility (Sek.)<input name="agility" inputMode="decimal" /></label><label>Ausdauerwert<input name="endurance" inputMode="decimal" /></label><label>Sprungkraft (cm)<input name="jump" inputMode="decimal" /></label></div><button className="primary-button" type="submit">Messung speichern</button></form></dialog>;
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="diagnostic-dialog-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><form className="coach-modal diagnostic-entry-dialog" onSubmit={onSubmit}><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">NEUE LEISTUNGSDIAGNOSTIK</p><h2 id="diagnostic-dialog-title">{profile.firstName}</h2><p className="diagnostic-entry-intro">Neue Messung ergänzen. Bestehende Diagnostiken bleiben im Verlauf erhalten.</p><div className="form-grid diagnostic-form"><label>Datum<input autoFocus name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></label><span /><label>Sprint 5 m (Sek.)<input name="sprint5" inputMode="decimal" /></label><label>Sprint 10 m (Sek.)<input name="sprint10" inputMode="decimal" /></label><label>Sprint 20 m (Sek.)<input name="sprint20" inputMode="decimal" /></label><label>Agility (Sek.)<input name="agility" inputMode="decimal" /></label><label>Ausdauerwert<input name="endurance" inputMode="decimal" /></label><label>Sprungkraft (cm)<input name="jump" inputMode="decimal" /></label></div><div className="modal-actions"><button className="text-button" type="button" onClick={onClose}>Abbrechen</button><button className="primary-button" type="submit">Messung speichern</button></div></form></div>;
 }
-
