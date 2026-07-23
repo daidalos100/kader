@@ -435,6 +435,16 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .player-card-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
 .fc-card { height: 690px; min-height: 0; perspective: 1200px; }
 .fc-card-inner { position: relative; width: 100%; height: 100%; min-height: 0; transform-style: preserve-3d; transition: transform .55s ease; }
+.static-card .fc-card-inner { transform: none; }
+.static-face { position: relative; inset: auto; transform: none; backface-visibility: visible; overflow: hidden; }
+.static-card-content { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; align-items: center; overflow: hidden; padding: 28px 24px 12px; }
+.static-card-content > img { width: min(190px, 68%); aspect-ratio: 1; margin-top: 12px; border: 4px solid rgba(244,243,239,.82); border-radius: 50%; object-fit: cover; box-shadow: 0 14px 45px rgba(0,0,0,.5); }
+.static-card-content > .fc-name { margin-top: 12px; }
+.static-card-content > .fc-foot { margin-top: 8px; }
+.static-card-content > p:not(.section-index) { max-width: 280px; margin: 10px 0 0; color: #8f9197; font-size: .72rem; line-height: 1.35; text-align: center; }
+.static-card-content > .section-index { align-self: stretch; margin: 16px 0 6px; }
+.static-card-actions { display: grid; grid-template-columns: 1fr 1fr; flex: 0 0 48px; }
+.static-card-actions .card-edit { min-height: 48px; }
 .fc-card.flipped .fc-card-inner { transform: rotateY(180deg); }
 .fc-face { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(239,22,28,.5); background: radial-gradient(circle at 50% 20%, rgba(239,22,28,.2), transparent 38%), linear-gradient(145deg, #17181d, #090a0d 72%); box-shadow: 0 18px 55px rgba(0,0,0,.36); backface-visibility: hidden; }
 .fc-face::before { content: ""; position: absolute; inset: 8px; pointer-events: none; border: 1px solid rgba(244,243,239,.1); }
