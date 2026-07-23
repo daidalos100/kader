@@ -75,8 +75,9 @@ function assembleState(rows: RecordRow[]) {
       }
     }
     if (row.scope === "diagnostic" && row.data && typeof row.data === "object") {
+      const diagnostic = row.data as { deleted?: unknown };
       const [playerId] = splitCompositeKey(row.record_key);
-      if (playerId) (state.diagnostics[playerId] ??= []).push(row.data);
+      if (playerId && diagnostic.deleted !== true) (state.diagnostics[playerId] ??= []).push(row.data);
     }
     if (row.scope === "tactic" && row.data && typeof row.data === "object") {
       const tactic = row.data as { deleted?: unknown };
@@ -140,8 +141,10 @@ function validOperation(value: unknown): value is Operation {
       typeof value.value.personality === "string" && value.value.personality.length <= 500;
   }
   if (value.scope === "diagnostic") {
-    if (!isRecord(value.value) || typeof value.value.id !== "string" || typeof value.value.date !== "string") return false;
+    if (!isRecord(value.value) || typeof value.value.id !== "string") return false;
     const diagnostic = value.value;
+    if (diagnostic.deleted === true) return diagnostic.id.length >= 8 && diagnostic.id.length <= 80;
+    if (typeof diagnostic.date !== "string") return false;
     return ["sprint5", "sprint10", "sprint20", "agility", "endurance", "jump"].every((field) => {
       const item = diagnostic[field];
       return item === null || (typeof item === "number" && Number.isFinite(item) && item >= 0 && item <= 10_000);
