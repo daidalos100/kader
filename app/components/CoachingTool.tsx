@@ -572,7 +572,7 @@ export default function CoachingTool() {
               <div className="overview-grid">
                 <article className="next-event-card">
                   <p className="section-index">NÄCHSTER WETTKAMPF</p>
-                  {nextGame ? <><span className="event-date">{formatDate(nextGame.start)}</span><h2>{nextGame.title}</h2><p>{nextGame.location || "Ort noch offen"}</p><div className="card-actions"><button onClick={() => openEvent(nextGame, "lineup")}>Kader planen</button><button className="secondary" onClick={() => openEvent(nextGame, "matchday")}>Spieltag</button></div></> : <p>Aktuell ist kein Spiel eingetragen.</p>}
+                  {nextGame ? <><span className="event-date">{formatDate(nextGame.start)}</span><h2>{nextGame.title}</h2><p>{nextGame.location || "Ort noch offen"}</p><div className="card-actions"><button onClick={() => openEvent(nextGame, "lineup")}>Kader planen</button><button className="secondary" onClick={() => openEvent(nextGame, "attendance")}>Teilnahme eintragen</button><button className="secondary" onClick={() => openEvent(nextGame, "matchday")}>Spieltag</button></div></> : <p>Aktuell ist kein Spiel eingetragen.</p>}
                 </article>
                 <div className="overview-metrics">
                   <article><strong>{profiles.length}</strong><span>Spieler:innen</span></article>
