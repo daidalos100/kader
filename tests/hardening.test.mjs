@@ -80,6 +80,17 @@ test("matchday capture records and reverses scorer and assist together", async (
   assert.ok(route.includes("goalEvents"));
 });
 
+test("appearances are derived from saved matchday lineups", async () => {
+  const [component, route] = await Promise.all([
+    source("app/components/CoachingTool.tsx"), source("app/api/lineup/route.ts"),
+  ]);
+  for (const marker of ["eventLineups", "appearanceCounts", "eligibleEventLineupIds", "match-statistic-note"]) {
+    assert.ok(component.includes(marker), `missing ${marker}`);
+  }
+  assert.ok(route.includes('params.get("eventLineups")'));
+  assert.ok(route.includes("lineup_id=like.event-*"));
+});
+
 test("diagnostic cards support imported metrics without embedding player data", async () => {
   const component = await source("app/components/CoachingTool.tsx");
   for (const marker of ["DiagnosticMetric", "metrics", "dribbling", "shuttleRun", "Standweitsprung"]) {
