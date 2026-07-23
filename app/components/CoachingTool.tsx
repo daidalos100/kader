@@ -321,7 +321,7 @@ export default function CoachingTool() {
     const entries = { ...current.entries, [scorerId]: { ...scorer, goals: scorer.goals + 1 } };
     if (assistId && assist) entries[assistId] = { ...assist, assists: assist.assists + 1 };
     const next = { ...current, entries, goalEvents: [...(current.goalEvents ?? []), goal] };
-    const operations = [operation("match_goal", `${eventId}:${goal.id}`, goal), operation("match_entry", `${eventId}:${scorerId}`, entries[scorerId])];
+    const operations = [operation("match_meta", eventId, { result: next.result, goalEvents: next.goalEvents }), operation("match_entry", `${eventId}:${scorerId}`, entries[scorerId])];
     if (assistId) operations.push(operation("match_entry", `${eventId}:${assistId}`, entries[assistId]));
     return save({ ...state, matches: { ...state.matches, [eventId]: next } }, operations);
   }
@@ -333,7 +333,7 @@ export default function CoachingTool() {
     const entries = { ...current.entries, [goal.scorerId]: { ...scorer, goals: Math.max(0, scorer.goals - 1) } };
     if (goal.assistId && entries[goal.assistId]) entries[goal.assistId] = { ...entries[goal.assistId], assists: Math.max(0, entries[goal.assistId].assists - 1) };
     const next = { ...current, entries, goalEvents: (current.goalEvents ?? []).filter((item) => item.id !== goal.id) };
-    const operations = [operation("match_goal", `${eventId}:${goal.id}`, { ...goal, deleted: true }), operation("match_entry", `${eventId}:${goal.scorerId}`, entries[goal.scorerId])];
+    const operations = [operation("match_meta", eventId, { result: next.result, goalEvents: next.goalEvents }), operation("match_entry", `${eventId}:${goal.scorerId}`, entries[goal.scorerId])];
     if (goal.assistId && entries[goal.assistId]) operations.push(operation("match_entry", `${eventId}:${goal.assistId}`, entries[goal.assistId]));
     return save({ ...state, matches: { ...state.matches, [eventId]: next } }, operations);
   }
