@@ -286,11 +286,12 @@ export default function CoachingTool() {
   }
 
   function setAttendance(eventId: string, id: string, status: AttendanceStatus, reason?: AbsenceReason) {
+    const record = status === "excused" && reason ? { status, reason } : status;
     void save({
       ...state,
       attendance: { ...state.attendance, [eventId]: { ...(state.attendance[eventId] ?? {}), [id]: status } },
       attendanceReasons: status === "excused" && reason ? { ...state.attendanceReasons, [eventId]: { ...(state.attendanceReasons[eventId] ?? {}), [id]: reason } } : state.attendanceReasons,
-    }, [operation("attendance", `${eventId}:${id}`, status), ...(status === "excused" && reason ? [operation("attendance_reason", `${eventId}:${id}`, reason)] : [])]);
+    }, [operation("attendance", `${eventId}:${id}`, record)]);
   }
 
   function setAllPresent(eventId: string) {
@@ -438,15 +439,13 @@ export default function CoachingTool() {
     if (!await save({ ...state, tactics: { ...state.tactics, [id]: value } }, [operation("tactic", id, value)])) throw new Error("Taktik konnte nicht gelöscht werden.");
   }
 
-  const eligibleEventLineupIds = useMemo(() => calendarEvents
-    .filter((event) => (event.type === "game" || event.type === "tournament") && new Date(event.start).getTime() >= seasonStart)
-    .map(eventLineupId), [calendarEvents]);
+  const gameEvents = useMemo(() => calendarEvents
+    .filter((event) => (event.type === "game" || event.type === "tournament") && new Date(event.start).getTime() >= seasonStart), [calendarEvents]);
+  const eligibleEventLineupIds = useMemo(() => gameEvents.map(eventLineupId), [gameEvents]);
   const calendarEventById = useMemo(() => new Map(calendarEvents.map((event) => [event.id, event])), [calendarEvents]);
   const appearanceEventsByPlayer = useMemo(() => {
     const appearances: Record<string, StatEventDetail[]> = {};
-    calendarEvents
-      .filter((event) => (event.type === "game" || event.type === "tournament") && new Date(event.start).getTime() >= seasonStart)
-      .forEach((event) => {
+    gameEvents.forEach((event) => {
       const lineupId = eventLineupId(event);
       const used = new Set<string>();
       Object.values(eventLineups[lineupId] ?? {}).flat().forEach((entry) => {
@@ -454,34 +453,36 @@ export default function CoachingTool() {
           ?? profiles.find((item) => item.firstName.localeCompare(entry.firstName?.trim() ?? "", "de", { sensitivity: "base" }) === 0);
         if (player) used.add(player.id);
       });
-      used.forEach((id) => { (appearances[id] ??= []).push({ eventId: event.id, title: event.title, date: formatDate(event.start, false), detail: "Im Kader" }); });
+      const lineupSaved = used.size > 0;
+      profiles.forEach((player) => {
+        const attendanceStatus = state.attendance[event.id]?.[player.id];
+        const detail = used.has(player.id) ? "Im Kader" : attendanceStatus === "not_selected" ? "Nicht im Kader" : lineupSaved ? "Nicht im Kader" : "Noch nicht geplant";
+        (appearances[player.id] ??= []).push({ eventId: event.id, title: event.title, date: formatDate(event.start, false), detail });
+      });
     });
     return appearances;
-  }, [calendarEvents, eventLineups, profiles]);
-  const appearanceCounts = useMemo(() => Object.fromEntries(Object.entries(appearanceEventsByPlayer).map(([id, events]) => [id, events.length])), [appearanceEventsByPlayer]);
+  }, [gameEvents, eventLineups, profiles, state.attendance]);
+  const appearanceCounts = useMemo(() => Object.fromEntries(Object.entries(appearanceEventsByPlayer).map(([id, events]) => [id, events.filter((event) => event.detail === "Im Kader").length])), [appearanceEventsByPlayer]);
   const totalMatches = eligibleEventLineupIds.filter((lineupId) => Object.values(eventLineups[lineupId] ?? {}).some((players) => players.length > 0)).length;
-  const trainingEventIds = useMemo(() => new Set(calendarEvents.filter((event) => event.type === "training").map((event) => event.id)), [calendarEvents]);
   const statsRows = profiles.map((player) => {
     let appearances = 0; let goals = 0; let assists = 0; let present = 0; let recorded = 0;
     const goalEvents: StatEventDetail[] = [];
     const assistEvents: StatEventDetail[] = [];
-    const trainingEvents: StatEventDetail[] = [];
+    const trainingEvents: StatEventDetail[] = calendarEvents.filter((event) => event.type === "training").map((event) => {
+      const status = state.attendance[event.id]?.[player.id];
+      const reason = status === "excused" ? state.attendanceReasons[event.id]?.[player.id] : undefined;
+      if (status) {
+        recorded += 1;
+        if (status === "present") present += 1;
+      }
+      return { eventId: event.id, title: event.title, date: formatDate(event.start, false), detail: status === "present" ? "Anwesend" : status === "excused" ? `Entschuldigt${reason ? ` (${reason})` : ""}` : status === "not_selected" ? "Nicht im Kader" : status === "absent" ? "Abwesend" : "Noch nicht erfasst" };
+    });
     Object.entries(state.matches).forEach(([eventId, match]) => {
       const entry = match.entries[player.id];
       goals += entry?.goals ?? 0; assists += entry?.assists ?? 0;
       const event = calendarEventById.get(eventId);
       if (entry?.goals) goalEvents.push({ eventId, title: event?.title ?? "Spiel", date: event ? formatDate(event.start, false) : "Spieltag", detail: `${entry.goals} ${entry.goals === 1 ? "Tor" : "Tore"}` });
       if (entry?.assists) assistEvents.push({ eventId, title: event?.title ?? "Spiel", date: event ? formatDate(event.start, false) : "Spieltag", detail: `${entry.assists} ${entry.assists === 1 ? "Assist" : "Assists"}` });
-    });
-    Object.entries(state.attendance).forEach(([eventId, attendance]) => {
-      if (!trainingEventIds.has(eventId)) return;
-      const status = attendance[player.id];
-      if (!status) return;
-      recorded += 1;
-      if (status === "present") present += 1;
-      const event = calendarEventById.get(eventId);
-      const reason = status === "excused" ? state.attendanceReasons[eventId]?.[player.id] : undefined;
-      trainingEvents.push({ eventId, title: event?.title ?? "Training", date: event ? formatDate(event.start, false) : "Trainingstermin", detail: status === "present" ? "Anwesend" : status === "excused" ? `Entschuldigt${reason ? ` · ${reason}` : ""}` : status === "not_selected" ? "Nicht im Kader" : "Abwesend" });
     });
     appearances = appearanceCounts[player.id] ?? 0;
     return { player, appearances, goals, assists, participation: recorded ? Math.round((present / recorded) * 100) : null, appearanceEvents: appearanceEventsByPlayer[player.id] ?? [], goalEvents, assistEvents, trainingEvents };
