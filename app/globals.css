@@ -447,13 +447,19 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .fc-foot { margin-top: 12px; color: #85878d; font-size: .66rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .fc-foot strong { color: var(--white); }
 .card-flip-area > p:not(.section-index) { max-width: 280px; margin: 20px 0 0; color: #8f9197; font-size: .78rem; line-height: 1.45; text-align: center; }
-.card-edit { position: relative; z-index: 2; flex: 0 0 48px; min-height: 48px; border: 0; border-top: 1px solid rgba(244,243,239,.13); background: rgba(255,255,255,.025); color: #b8b9bd; font-size: .63rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
-.card-edit:hover { color: var(--white); background: var(--red); }
+.card-edit { position: relative; z-index: 4; flex: 0 0 48px; min-height: 48px; border: 0; border-top: 1px solid rgba(244,243,239,.13); background: rgba(255,255,255,.025); color: #b8b9bd; font-size: .63rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; pointer-events: auto; transition: background .18s ease, color .18s ease; }
+.card-edit:hover, .card-edit:focus-visible { color: var(--white); background: var(--red); outline: 2px solid rgba(239,22,28,.72); outline-offset: -2px; }
 .fc-back .card-flip-area { align-items: stretch; overflow-y: auto; scrollbar-color: rgba(239,22,28,.8) transparent; text-align: left; }
 .fc-back h3 { margin: 8px 0 22px; font-size: 2.2rem; text-transform: uppercase; }
 .fc-metrics { display: grid; grid-template-columns: repeat(2, 1fr); border: 1px solid rgba(244,243,239,.13); }
 .fc-metrics div { display: grid; gap: 5px; padding: 14px; border-right: 1px solid rgba(244,243,239,.1); border-bottom: 1px solid rgba(244,243,239,.1); }
-.fc-metrics strong { font-size: 1.6rem; }
+.fc-metrics .season-metric { min-width: 0; }
+.season-metric-value { display: flex; align-items: center; gap: 8px; min-height: 31px; }
+.season-metric-value strong { font-size: 1.6rem; }
+.season-metric-value .diagnostic-dot { width: 8px; height: 8px; flex-basis: 8px; }
+.season-metric-value .diagnostic-crown { margin-left: auto; font-size: .88rem; }
+.season-progress { height: 5px; margin: 1px 0 2px; overflow: hidden; border-radius: 99px; background: rgba(244,243,239,.14); }
+.season-progress span { display: block; height: 100%; border-radius: inherit; background: #00b050; transition: width .25s ease; }
 .fc-metrics span { color: #85878d; font-size: .58rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .diagnostic-overview { display: grid; gap: 0; width: 100%; margin-top: 22px; }
 .diagnostic-overview > strong { margin-bottom: 8px; font-size: .69rem; letter-spacing: .08em; text-transform: uppercase; }
@@ -676,4 +682,3 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
   .tactics-workspace.presenting .tactics-scenarios { margin-inline: -8px; padding-inline: 8px; }
   .tactics-workspace.presenting .tactics-pitch { height: calc(100dvh - 120px); min-height: 720px; }
 }
-
