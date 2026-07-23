@@ -457,8 +457,11 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .fc-metrics span { color: #85878d; font-size: .58rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .diagnostic-mini { display: grid; gap: 0; margin-top: 22px; }
 .diagnostic-mini > strong { margin-bottom: 8px; font-size: .69rem; letter-spacing: .08em; text-transform: uppercase; }
-.diagnostic-mini > div { display: grid; grid-template-columns: 1fr auto 64px; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(244,243,239,.08); font-size: .72rem; }
-.diagnostic-mini > div > span { color: #9a9ca1; }
+.diagnostic-mini > div { display: grid; grid-template-columns: minmax(0, 1fr) auto 64px; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(244,243,239,.08); font-size: .72rem; }
+.diagnostic-mini > div > span { display: grid; gap: 2px; min-width: 0; color: #9a9ca1; }
+.diagnostic-mini > div > span strong { color: #d9dadd; font-size: .67rem; }
+.diagnostic-mini small { display: block; overflow: hidden; color: #777a80; font-size: .53rem; font-weight: 500; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.diagnostic-source { margin-top: 8px; color: #777a80; font-size: .5rem; }
 .diagnostic-mini em { font-style: normal; text-align: right; }
 .delta-positive { color: #55ce75; }
 .delta-negative { color: #ff6c70; }
