@@ -55,7 +55,7 @@ function assembleState(rows: RecordRow[]) {
     if (row.scope === "profile" && row.data && typeof row.data === "object") state.profiles[row.record_key] = row.data;
     if (row.scope === "attendance") {
       const [eventId, playerId] = splitCompositeKey(row.record_key);
-      if (eventId && playerId && ["present", "excused", "absent"].includes(String(row.data))) {
+      if (eventId && playerId && ["present", "excused", "absent", "not_selected"].includes(String(row.data))) {
         state.attendance[eventId] ??= {};
         state.attendance[eventId][playerId] = row.data;
       }
@@ -113,7 +113,7 @@ function validOperation(value: unknown): value is Operation {
   if (typeof serialized !== "string" || serialized.length > 25_000) return false;
 
   if (value.scope === "roster") return typeof value.value === "string" && value.value.trim().length > 0 && value.value.length <= 30;
-  if (value.scope === "attendance") return ["present", "excused", "absent"].includes(String(value.value));
+  if (value.scope === "attendance") return ["present", "excused", "absent", "not_selected"].includes(String(value.value));
   if (value.scope === "match_meta") {
     if (!isRecord(value.value) || typeof value.value.result !== "string" || value.value.result.length > 20) return false;
     const goalEvents = value.value.goalEvents;
