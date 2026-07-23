@@ -475,13 +475,15 @@ export default function CoachingTool() {
     return counts;
   }, [eligibleEventLineupIds, eventLineups, profiles]);
   const totalMatches = eligibleEventLineupIds.filter((lineupId) => Object.values(eventLineups[lineupId] ?? {}).some((players) => players.length > 0)).length;
+  const trainingEventIds = useMemo(() => new Set(calendarEvents.filter((event) => event.type === "training").map((event) => event.id)), [calendarEvents]);
   const statsRows = profiles.map((player) => {
     let appearances = 0; let goals = 0; let assists = 0; let present = 0; let recorded = 0;
     Object.values(state.matches).forEach((match) => {
       const entry = match.entries[player.id];
       goals += entry?.goals ?? 0; assists += entry?.assists ?? 0;
     });
-    Object.values(state.attendance).forEach((attendance) => {
+    Object.entries(state.attendance).forEach(([eventId, attendance]) => {
+      if (!trainingEventIds.has(eventId)) return;
       if (attendance[player.id]) recorded += 1;
       if (attendance[player.id] === "present") present += 1;
     });
@@ -596,11 +598,7 @@ export default function CoachingTool() {
                   {calendarEvents.length ? calendarEvents.map((event) => <EventCard key={event.id} event={event} active={selectedEvent?.id === event.id} anchor={event.id === nextCalendarEventId} onOpen={openEvent} />) : <p className="calendar-empty">Ab dem 07.07.2026 sind noch keine Termine im Kalender.</p>}
                 </div>
                 <aside className="event-detail">
-                  {selectedEvent ? selectedEvent.type === "training" ? (
-                    <AttendancePanel event={selectedEvent} profiles={profiles} attendance={state.attendance[selectedEvent.id] ?? {}} reasons={state.attendanceReasons[selectedEvent.id] ?? {}} onSet={setAttendance} onAll={setAllPresent} onEdit={() => setEditingCalendarEvent(selectedEvent)} />
-                  ) : (
-                    <><div className="detail-head"><div><p className="section-index">{eventLabel(selectedEvent.type)}</p><h2>{selectedEvent.title}</h2><p>{formatDate(selectedEvent.start)}</p><p>{selectedEvent.location}</p></div><button className="text-button" type="button" onClick={() => setEditingCalendarEvent(selectedEvent)}>Termin bearbeiten</button></div><div className="card-actions"><button onClick={() => openEvent(selectedEvent, "lineup")}>Kader planen</button><button className="secondary" onClick={() => openEvent(selectedEvent, "matchday")}>Spieltag erfassen</button></div></>
-                  ) : <div className="empty-detail"><span>←</span><p>Termin auswählen, um Anwesenheit, Kader oder Statistik zu bearbeiten.</p></div>}
+                  {selectedEvent ? <><AttendancePanel event={selectedEvent} profiles={profiles} attendance={state.attendance[selectedEvent.id] ?? {}} reasons={state.attendanceReasons[selectedEvent.id] ?? {}} onSet={setAttendance} onAll={setAllPresent} onEdit={() => setEditingCalendarEvent(selectedEvent)} />{(selectedEvent.type === "game" || selectedEvent.type === "tournament") && <div className="card-actions"><button onClick={() => openEvent(selectedEvent, "lineup")}>Kader planen</button><button className="secondary" onClick={() => openEvent(selectedEvent, "matchday")}>Spieltag erfassen</button></div>}</> : <div className="empty-detail"><span>←</span><p>Termin auswählen, um Teilnahme, Kader oder Statistik zu bearbeiten.</p></div>}
                 </aside>
               </div>
             </section>
@@ -766,14 +764,13 @@ function HistoryPanel({ onRestored }: { onRestored: () => Promise<void> }) {
 }
 
 function EventCard({ event, active, anchor, onOpen }: { event: CalendarEvent; active?: boolean; anchor?: boolean; onOpen: (event: CalendarEvent, target: "attendance" | "lineup" | "stats") => void }) {
-  const target = event.type === "training" ? "attendance" : event.type === "other" ? "attendance" : "lineup";
-  return <article id={anchor ? "next-calendar-event" : undefined} className={`event-card type-${event.type}${active ? " active" : ""}${anchor ? " calendar-next-anchor" : ""}`}><div className="event-card-top"><span>{anchor ? "Nächster Termin" : eventLabel(event.type)}</span><time>{formatDate(event.start)}</time></div><h3>{event.title}</h3><p>{event.location || "Ort noch offen"}</p><button type="button" onClick={() => onOpen(event, target)}>{event.type === "training" ? "Teilnahme eintragen" : event.type === "other" ? "Termin öffnen" : "Kader planen"} →</button></article>;
+  return <article id={anchor ? "next-calendar-event" : undefined} className={`event-card type-${event.type}${active ? " active" : ""}${anchor ? " calendar-next-anchor" : ""}`}><div className="event-card-top"><span>{anchor ? "Nächster Termin" : eventLabel(event.type)}</span><time>{formatDate(event.start)}</time></div><h3>{event.title}</h3><p>{event.location || "Ort noch offen"}</p><button type="button" onClick={() => onOpen(event, "attendance")}>Teilnahme eintragen →</button></article>;
 }
 
 function AttendancePanel({ event, profiles, attendance, reasons, onSet, onAll, onEdit }: { event: CalendarEvent; profiles: Profile[]; attendance: Record<string, AttendanceStatus>; reasons: Record<string, AbsenceReason>; onSet: (eventId: string, id: string, status: AttendanceStatus, reason?: AbsenceReason) => void; onAll: (eventId: string) => void; onEdit: () => void }) {
   const [reasonPlayer, setReasonPlayer] = useState<string | null>(null);
   const absenceReasons: AbsenceReason[] = ["Krankheit", "Verletzung", "Privat", "Schul-Event"];
-  return <><div className="detail-head"><div><p className="section-index">TRAININGSTEILNAHME</p><h2>{event.title}</h2><p>{formatDate(event.start)}</p></div><div className="detail-actions"><button className="text-button" type="button" onClick={onEdit}>Termin bearbeiten</button><button className="text-button" onClick={() => onAll(event.id)}>Alle anwesend</button></div></div><div className="attendance-list">{profiles.map((player) => <div className="attendance-row" key={player.id}><div><Image src={`/api/player-image?name=${encodeURIComponent(player.firstName)}`} alt="" width={38} height={38} unoptimized /><strong>{player.firstName}</strong>{attendance[player.id] === "excused" && reasons[player.id] && <small className="attendance-reason">{reasons[player.id]}</small>}</div><div className="attendance-options">{(["present", "excused", "absent"] as AttendanceStatus[]).map((status) => <button key={status} className={`${status}${attendance[player.id] === status ? " selected" : ""}`} onClick={() => status === "excused" ? setReasonPlayer(player.id) : onSet(event.id, player.id, status)} aria-label={`${player.firstName}: ${{ present: "anwesend", excused: "entschuldigt", absent: "abwesend" }[status]}`}><span />{{ present: "Anwesend", excused: "Entschuldigt", absent: "Abwesend" }[status]}</button>)}{reasonPlayer === player.id && <select className="attendance-reason-select" aria-label={`${player.firstName}: Grund auswählen`} value={reasons[player.id] ?? ""} onChange={(event) => { const reason = event.target.value as AbsenceReason; if (reason) { onSet(event.currentTarget.name || "", player.id, "excused", reason); setReasonPlayer(null); } }} name={event.id}><option value="">Grund wählen</option>{absenceReasons.map((reason) => <option key={reason} value={reason}>{reason}</option>)}</select>}</div></div>)}</div></>;
+  return <><div className="detail-head"><div><p className="section-index">TEILNAHME</p><h2>{event.title}</h2><p>{formatDate(event.start)}</p></div><div className="detail-actions"><button className="text-button" type="button" onClick={onEdit}>Termin bearbeiten</button><button className="text-button" onClick={() => onAll(event.id)}>Alle anwesend</button></div></div><div className="attendance-list">{profiles.map((player) => <div className="attendance-row" key={player.id}><div><Image src={`/api/player-image?name=${encodeURIComponent(player.firstName)}`} alt="" width={38} height={38} unoptimized /><strong>{player.firstName}</strong>{attendance[player.id] === "excused" && reasons[player.id] && <small className="attendance-reason">{reasons[player.id]}</small>}</div><div className="attendance-options">{(["present", "excused", "absent"] as AttendanceStatus[]).map((status) => <button key={status} className={`${status}${attendance[player.id] === status ? " selected" : ""}`} onClick={() => status === "excused" ? setReasonPlayer(player.id) : onSet(event.id, player.id, status)} aria-label={`${player.firstName}: ${{ present: "anwesend", excused: "entschuldigt", absent: "abwesend" }[status]}`}><span />{{ present: "Anwesend", excused: "Entschuldigt", absent: "Abwesend" }[status]}</button>)}{reasonPlayer === player.id && <select className="attendance-reason-select" aria-label={`${player.firstName}: Grund auswählen`} value={reasons[player.id] ?? ""} onChange={(event) => { const reason = event.target.value as AbsenceReason; if (reason) { onSet(event.currentTarget.name || "", player.id, "excused", reason); setReasonPlayer(null); } }} name={event.id}><option value="">Grund wählen</option>{absenceReasons.map((reason) => <option key={reason} value={reason}>{reason}</option>)}</select>}</div></div>)}</div></>;
 }
 
 function CalendarEventDialog({ event, onClose, onSubmit }: { event: CalendarEvent; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
