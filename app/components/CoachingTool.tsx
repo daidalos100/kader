@@ -63,6 +63,7 @@ type HistoryEntry = { id: number; scope: string; record_key: string; revision: n
 
 const positionOptions = ["TW", "IV", "LV", "RV", "ZDM", "ZM", "LF", "RF", "ST"];
 const seasonStart = new Date("2026-07-25T00:00:00+02:00").getTime();
+const calendarVisibleFrom = new Date("2026-07-07T00:00:00+02:00").getTime();
 const emptyState: CoachingState = { roster: [], profiles: {}, attendance: {}, attendanceReasons: {}, matches: {}, diagnostics: {}, tactics: {}, calendarOverrides: {} };
 function playerId(name: string) {
   return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "-");
@@ -148,14 +149,18 @@ export default function CoachingTool() {
   const [eventLineups, setEventLineups] = useState<Record<string, SavedLineup>>({});
   const [editingCalendarEvent, setEditingCalendarEvent] = useState<CalendarEvent | null>(null);
   const [referenceTime] = useState(() => Date.now());
+  const calendarListRef = useRef<HTMLDivElement>(null);
 
   const profiles = useMemo(
     () => state.roster.map((name) => profileFor(name, state.profiles[playerId(name)])),
     [state.profiles, state.roster],
   );
-  const calendarEvents = useMemo(() => events.map((event) => ({ ...event, ...(state.calendarOverrides[event.id] ?? {}) })), [events, state.calendarOverrides]);
+  const calendarEvents = useMemo(() => events
+    .map((event) => ({ ...event, ...(state.calendarOverrides[event.id] ?? {}) }))
+    .filter((event) => new Date(event.start).getTime() >= calendarVisibleFrom)
+    .sort((a, b) => a.start.localeCompare(b.start)), [events, state.calendarOverrides]);
   const upcoming = useMemo(() => calendarEvents.filter((event) => new Date(event.start).getTime() >= Math.max(referenceTime, seasonStart)).slice(0, 40), [calendarEvents, referenceTime]);
-  const pastEvents = useMemo(() => calendarEvents.filter((event) => new Date(event.start).getTime() < referenceTime).sort((a, b) => b.start.localeCompare(a.start)), [calendarEvents, referenceTime]);
+  const nextCalendarEventId = calendarEvents.find((event) => new Date(event.start).getTime() >= referenceTime)?.id ?? null;
   const nextEvents = upcoming.slice(0, 4);
   const nextGame = upcoming.find((event) => event.type === "game" || event.type === "tournament");
   const matchdayEvent = selectedEvent && (selectedEvent.type === "game" || selectedEvent.type === "tournament") ? selectedEvent : nextGame;
@@ -224,6 +229,16 @@ export default function CoachingTool() {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (tab !== "calendar" || !nextCalendarEventId) return;
+    const frame = window.requestAnimationFrame(() => {
+      const list = calendarListRef.current;
+      const anchor = list?.querySelector<HTMLElement>("#next-calendar-event");
+      if (list && anchor) list.scrollTop = Math.max(0, anchor.offsetTop - 10);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [tab, nextCalendarEventId, calendarEvents.length]);
 
   async function refreshCoachingState() {
     const response = await fetch("/api/coaching-state", { cache: "no-store" });
@@ -577,11 +592,8 @@ export default function CoachingTool() {
             <section className="coach-view">
               <div className="view-heading compact"><div><p className="section-index">GOOGLE KALENDER · LIVE</p><h1>Termine &amp; Teilnahme.</h1><p>Spiele und Trainings werden automatisch aus dem D1-Kalender übernommen.</p></div></div>
               <div className="calendar-layout">
-                <div className="calendar-list">
-                  <div className="calendar-list-heading">Kommende Termine</div>
-                  {upcoming.map((event) => <EventCard key={event.id} event={event} active={selectedEvent?.id === event.id} onOpen={openEvent} />)}
-                  <div className="calendar-list-heading past">Vergangene Termine</div>
-                  {pastEvents.length ? pastEvents.map((event) => <EventCard key={event.id} event={event} active={selectedEvent?.id === event.id} onOpen={openEvent} />) : <p className="calendar-empty">Noch keine vergangenen Termine im Kalender.</p>}
+                <div className="calendar-list" ref={calendarListRef}>
+                  {calendarEvents.length ? calendarEvents.map((event) => <EventCard key={event.id} event={event} active={selectedEvent?.id === event.id} anchor={event.id === nextCalendarEventId} onOpen={openEvent} />) : <p className="calendar-empty">Ab dem 07.07.2026 sind noch keine Termine im Kalender.</p>}
                 </div>
                 <aside className="event-detail">
                   {selectedEvent ? selectedEvent.type === "training" ? (
@@ -753,9 +765,9 @@ function HistoryPanel({ onRestored }: { onRestored: () => Promise<void> }) {
   </section>;
 }
 
-function EventCard({ event, active, onOpen }: { event: CalendarEvent; active?: boolean; onOpen: (event: CalendarEvent, target: "attendance" | "lineup" | "stats") => void }) {
+function EventCard({ event, active, anchor, onOpen }: { event: CalendarEvent; active?: boolean; anchor?: boolean; onOpen: (event: CalendarEvent, target: "attendance" | "lineup" | "stats") => void }) {
   const target = event.type === "training" ? "attendance" : event.type === "other" ? "attendance" : "lineup";
-  return <article className={`event-card type-${event.type}${active ? " active" : ""}`}><div className="event-card-top"><span>{eventLabel(event.type)}</span><time>{formatDate(event.start)}</time></div><h3>{event.title}</h3><p>{event.location || "Ort noch offen"}</p><button type="button" onClick={() => onOpen(event, target)}>{event.type === "training" ? "Teilnahme eintragen" : event.type === "other" ? "Termin öffnen" : "Kader planen"} →</button></article>;
+  return <article id={anchor ? "next-calendar-event" : undefined} className={`event-card type-${event.type}${active ? " active" : ""}${anchor ? " calendar-next-anchor" : ""}`}><div className="event-card-top"><span>{anchor ? "Nächster Termin" : eventLabel(event.type)}</span><time>{formatDate(event.start)}</time></div><h3>{event.title}</h3><p>{event.location || "Ort noch offen"}</p><button type="button" onClick={() => onOpen(event, target)}>{event.type === "training" ? "Teilnahme eintragen" : event.type === "other" ? "Termin öffnen" : "Kader planen"} →</button></article>;
 }
 
 function AttendancePanel({ event, profiles, attendance, reasons, onSet, onAll, onEdit }: { event: CalendarEvent; profiles: Profile[]; attendance: Record<string, AttendanceStatus>; reasons: Record<string, AbsenceReason>; onSet: (eventId: string, id: string, status: AttendanceStatus, reason?: AbsenceReason) => void; onAll: (eventId: string) => void; onEdit: () => void }) {
