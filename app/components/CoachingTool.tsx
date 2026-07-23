@@ -45,6 +45,7 @@ type Diagnostic = {
 type DiagnosticMetric = { attempts: Array<number | string | null>; best: number | null; percentile: number | null; category: string | null; rating: string | null };
 type DiagnosticDisciplineKey = "sprint10" | "sprint20" | "agility" | "dribbling" | "shuttleRun" | "jump";
 type SeasonStatKey = "appearances" | "training" | "goals" | "assists";
+type StatSortKey = "player" | "appearances" | "goals" | "assists" | "training";
 type CoachingState = {
   roster: string[];
   profiles: Record<string, Partial<Profile>>;
@@ -802,10 +803,23 @@ function Delta({ current, previous, lowerIsBetter }: { current: number | null; p
 }
 
 function StatsTable({ rows, totalMatches }: { rows: Array<{ player: Profile; appearances: number; goals: number; assists: number; participation: number | null }>; totalMatches: number }) {
+  const [sortKey, setSortKey] = useState<StatSortKey>("player");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const bestGoals = Math.max(0, ...rows.map((row) => row.goals));
   const bestAssists = Math.max(0, ...rows.map((row) => row.assists));
   const rateStatus = (value: number | null) => value === null ? "neutral" : value >= 80 ? "good" : value >= 60 ? "average" : "critical";
-  return <table className="stats-table"><thead><tr><th>Spieler:in</th><th>Einsätze</th><th>Tore</th><th>Assists</th><th>Training</th></tr></thead><tbody>{rows.map((row) => {
+  const changeSort = (key: StatSortKey) => {
+    if (key === sortKey) setSortDirection((direction) => direction === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDirection(key === "player" ? "asc" : "desc"); }
+  };
+  const sortedRows = [...rows].sort((left, right) => {
+    const leftValue = sortKey === "player" ? left.player.firstName : sortKey === "training" ? left.participation ?? -1 : left[sortKey];
+    const rightValue = sortKey === "player" ? right.player.firstName : sortKey === "training" ? right.participation ?? -1 : right[sortKey];
+    const result = typeof leftValue === "string" && typeof rightValue === "string" ? leftValue.localeCompare(rightValue, "de") : Number(leftValue) - Number(rightValue);
+    return result === 0 ? left.player.firstName.localeCompare(right.player.firstName, "de") : sortDirection === "asc" ? result : -result;
+  });
+  const header = (key: StatSortKey, label: string) => <th aria-sort={sortKey === key ? sortDirection === "asc" ? "ascending" : "descending" : "none"}><button type="button" className={`stats-sort-button${sortKey === key ? " active" : ""}`} onClick={() => changeSort(key)}>{label}<span aria-hidden="true">{sortKey === key ? sortDirection === "asc" ? "↑" : "↓" : "↕"}</span></button></th>;
+  return <table className="stats-table"><thead><tr>{header("player", "Spieler:in")}{header("appearances", "Einsätze")}{header("goals", "Tore")}{header("assists", "Assists")}{header("training", "Training")}</tr></thead><tbody>{sortedRows.map((row) => {
     const appearanceRate = totalMatches ? Math.round((row.appearances / totalMatches) * 100) : null;
     const trainingStatus = rateStatus(row.participation);
     const appearanceStatus = rateStatus(appearanceRate);
