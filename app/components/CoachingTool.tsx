@@ -550,7 +550,7 @@ export default function CoachingTool() {
 
       {editingProfile && <ProfileDialog profile={editingProfile} onClose={() => setEditingProfile(null)} onSubmit={saveProfile} />}
       {diagnosticPlayer && <DiagnosticDialog profile={diagnosticPlayer} onClose={() => setDiagnosticPlayer(null)} onSubmit={addDiagnostic} />}
-      {detailPlayer && <DiagnosticDetailsDialog profile={detailPlayer} history={state.diagnostics[detailPlayer.id] ?? []} onClose={() => setDetailPlayer(null)} onEdit={() => { setDetailPlayer(null); setDiagnosticPlayer(detailPlayer); }} />}
+      {detailPlayer && <DiagnosticDetailsDialog profile={detailPlayer} history={state.diagnostics[detailPlayer.id] ?? []} bestDisciplineKeys={diagnosticBestByPlayer[detailPlayer.id] ?? new Set()} onClose={() => setDetailPlayer(null)} onEdit={() => { setDetailPlayer(null); setDiagnosticPlayer(detailPlayer); }} />}
     </main>
   );
 }
@@ -656,7 +656,7 @@ function PlayerCard({ profile, flipped, appearances, appearanceRate, goals, assi
 }
 
 function StaticPlayerCard({ profile, appearanceRate, goals, assists, participation, bestSeasonStatKeys, history, bestDisciplineKeys, onEdit, onDetails }: { profile: Profile; appearanceRate: number | null; goals: number; assists: number; participation: number | null; bestSeasonStatKeys: Set<SeasonStatKey>; history: Diagnostic[]; bestDisciplineKeys: Set<DiagnosticDisciplineKey>; onEdit: () => void; onDetails: () => void }) {
-  return <article className="fc-card static-card"><div className="fc-card-inner"><section className="fc-face static-face"><div className="static-card-content"><div className="shirt-number">{profile.shirtNumber || "—"}</div><Image src={`/api/player-image?name=${encodeURIComponent(profile.firstName)}`} alt={profile.firstName} width={260} height={260} unoptimized /><div className="fc-name">{profile.firstName}</div><div className="fc-positions"><strong>{profile.primaryPosition || "POS"}</strong><span>{profile.secondaryPosition || "—"}</span></div><div className="fc-foot">Starker Fuß <strong>{{ left: "Links", right: "Rechts", both: "Beide", "": "—" }[profile.strongFoot]}</strong></div><p>{profile.personality || "Spielerpersönlichkeit noch nicht ergänzt."}</p><p className="section-index">SAISONWERTE</p><div className="fc-metrics"><SeasonMetric label="Einsätze" value={appearanceRate === null ? "—" : `${appearanceRate}%`} keyName="appearances" best={bestSeasonStatKeys.has("appearances")} progress={appearanceRate} /><SeasonMetric label="Training" value={participation === null ? "—" : `${participation}%`} keyName="training" best={bestSeasonStatKeys.has("training")} progress={participation} /><SeasonMetric label="Tore" value={goals} keyName="goals" best={bestSeasonStatKeys.has("goals")} /><SeasonMetric label="Assists" value={assists} keyName="assists" best={bestSeasonStatKeys.has("assists")} /></div><DiagnosticOverview latest={history[0]} bestDisciplineKeys={bestDisciplineKeys} /></div><div className="static-card-actions"><button type="button" className="card-edit" onClick={onEdit}>Profil</button><button type="button" className="card-edit diagnostic-details-button" onClick={onDetails}>Leistung</button></div></section></div></article>;
+  return <article className="fc-card static-card"><div className="fc-card-inner"><section className="fc-face static-face"><div className="static-card-content"><div className="shirt-number">{profile.shirtNumber || "—"}</div><Image src={`/api/player-image?name=${encodeURIComponent(profile.firstName)}`} alt={profile.firstName} width={260} height={260} unoptimized /><div className="fc-name">{profile.firstName}</div><div className="fc-positions"><strong>{profile.primaryPosition || "POS"}</strong><span>{profile.secondaryPosition || "—"}</span></div><div className="fc-foot">Starker Fuß <strong>{{ left: "Links", right: "Rechts", both: "Beide", "": "—" }[profile.strongFoot]}</strong></div><p className="section-index">SAISONWERTE</p><div className="fc-metrics"><SeasonMetric label="Einsätze" value={appearanceRate === null ? "—" : `${appearanceRate}%`} keyName="appearances" best={bestSeasonStatKeys.has("appearances")} progress={appearanceRate} /><SeasonMetric label="Training" value={participation === null ? "—" : `${participation}%`} keyName="training" best={bestSeasonStatKeys.has("training")} progress={participation} /><SeasonMetric label="Tore" value={goals} keyName="goals" best={bestSeasonStatKeys.has("goals")} /><SeasonMetric label="Assists" value={assists} keyName="assists" best={bestSeasonStatKeys.has("assists")} /></div><DiagnosticOverview latest={history[0]} previous={history[1]} bestDisciplineKeys={bestDisciplineKeys} compact /></div><div className="static-card-actions"><button type="button" className="card-edit" onClick={onEdit}>Profil</button><button type="button" className="card-edit diagnostic-details-button" onClick={onDetails}>Leistung</button></div></section></div></article>;
 }
 
 type DiagnosticStatus = "good" | "mid-good" | "average" | "below" | "critical" | "bad" | "neutral";
@@ -664,43 +664,65 @@ type DiagnosticStatus = "good" | "mid-good" | "average" | "below" | "critical" |
 function diagnosticStatus(metric?: DiagnosticMetric | null): DiagnosticStatus {
   const category = String(metric?.category ?? "").trim().toUpperCase();
   if (/^A(?:\/B)?$/.test(category)) return "good";
-  if (/^B(?:\/C)?$/.test(category)) return "average";
+  if (category === "B") return "average";
+  if (category === "B/C") return "average";
   if (category === "C") return "critical";
   const rating = `${metric?.rating ?? ""}`.toLowerCase();
   if (/ausgezeichnet|sehr gut|excellent|top/.test(rating)) return "good";
-  if (/gut|befriedigend|durchschnittlich|mittel/.test(rating)) return "average";
+  if (/^gut$/.test(rating)) return "mid-good";
+  if (/befriedigend/.test(rating)) return "below";
+  if (/durchschnittlich|mittel/.test(rating)) return "average";
   if (/ausreichend/.test(rating)) return "critical";
   if (/mangelhaft|unterdurchschnitt|schwach|schlecht|ungenügend/.test(rating)) return "bad";
   return "neutral";
 }
 
-function DiagnosticOverview({ latest, bestDisciplineKeys }: { latest?: Diagnostic; bestDisciplineKeys: Set<DiagnosticDisciplineKey> }) {
-  const rows = latest?.metrics ? [
-    ["sprint10", "10 m Sprint", latest.metrics.sprint10], ["sprint20", "20 m Sprint", latest.metrics.sprint20],
-    ["agility", "Laufgewandtheit", latest.metrics.agility], ["dribbling", "Dribbling", latest.metrics.dribbling],
-    ["shuttleRun", "Shuttle Run", { rating: latest.metrics.shuttleRun.rating, category: null } as DiagnosticMetric],
-    ["jump", "Standweitsprung", { rating: latest.metrics.jump.rating, category: null } as DiagnosticMetric],
-  ] as Array<[string, string, DiagnosticMetric]> : latest ? [
-    ["sprint10", "10 m Sprint", null], ["sprint20", "20 m Sprint", null], ["agility", "Agility", null], ["shuttleRun", "Ausdauer", null], ["jump", "Sprungkraft", null],
-  ] as Array<[string, string, DiagnosticMetric | null]> : [];
-  return <div className="diagnostic-overview"><strong>Leistungsdiagnostik{latest?.ageGroup ? ` · ${latest.ageGroup}` : ""}</strong>{rows.length ? rows.map(([key, label, metric]) => <div key={key}><span className={`diagnostic-dot ${diagnosticStatus(metric)}`} aria-label={`${label}: ${diagnosticStatus(metric)}`} /><span>{label}{bestDisciplineKeys.has(key as DiagnosticDisciplineKey) && <span className="diagnostic-crown" title="Bester Wert im Team" aria-label="Bester Wert im Team"> 👑</span>}</span></div>) : <p>Noch keine Messung erfasst.</p>}</div>;
+function metricFor(diagnostic: Diagnostic | undefined, key: DiagnosticDisciplineKey): DiagnosticMetric | null {
+  if (!diagnostic?.metrics) return null;
+  if (key === "shuttleRun") return { attempts: [], best: diagnostic.metrics.shuttleRun.level, percentile: null, category: null, rating: diagnostic.metrics.shuttleRun.rating };
+  if (key === "jump") return { attempts: diagnostic.metrics.jump.attempts, best: diagnostic.metrics.jump.best, percentile: null, category: null, rating: diagnostic.metrics.jump.rating };
+  return diagnostic.metrics[key];
 }
 
-function DiagnosticMetricRow({ label, metric, unit, previous }: { label: string; metric: DiagnosticMetric; unit: string; previous: number | null }) {
-  return <div><span><strong>{label}</strong><small>{metric.attempts.map((attempt, index) => `V${index + 1}: ${attempt ?? "—"}`).join(" · ")} · PR {metric.percentile === null ? "—" : `${Math.round(metric.percentile * 100)}%`} · {metric.category ?? "—"}</small></span><b>{metric.best ?? "—"}{metric.best !== null ? ` ${unit}` : ""}<small>{metric.rating ?? ""}</small></b><Delta current={metric.best} previous={previous} lowerIsBetter /></div>;
+function hasMetric(metric: DiagnosticMetric | null) { return Boolean(metric && (metric.best !== null || metric.attempts.some((value) => value !== null) || metric.rating)); }
+
+function Trend({ current, previous, lowerIsBetter, unit }: { current: number | null; previous: number | null; lowerIsBetter: boolean; unit?: string }) {
+  if (current === null || previous === null) return null;
+  const delta = current - previous;
+  const threshold = unit === "s" ? .01 : .005;
+  const direction = Math.abs(delta) <= threshold ? "neutral" : (lowerIsBetter ? delta < 0 : delta > 0) ? "positive" : "negative";
+  const arrow = direction === "positive" ? "↑" : direction === "negative" ? "↓" : "→";
+  const amount = Math.abs(delta).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  return <span className={`diagnostic-trend ${direction}`} title={direction === "positive" ? "Besser als U11" : direction === "negative" ? "Schwächer als U11" : "Unverändert gegenüber U11"}>{arrow} {amount}{unit ? ` ${unit}` : ""}</span>;
 }
 
-function DiagnosticDetailsDialog({ profile, history, onClose, onEdit }: { profile: Profile; history: Diagnostic[]; onClose: () => void; onEdit: () => void }) {
+function DiagnosticOverview({ latest, previous, bestDisciplineKeys, compact = false }: { latest?: Diagnostic; previous?: Diagnostic; bestDisciplineKeys: Set<DiagnosticDisciplineKey>; compact?: boolean }) {
+  const rows = ([
+    ["sprint10", "10 m Sprint", "10 m", true, "s"], ["sprint20", "20 m Sprint", "20 m", true, "s"],
+    ["agility", "Laufgewandtheit", "Agility", true, "s"], ["dribbling", "Dribbling", "Dribbling", true, "s"],
+    ["shuttleRun", "Shuttle Run", "Shuttle", false, ""], ["jump", "Standweitsprung", "Sprung", false, "m"],
+  ] as const).map(([key, label, shortLabel, lowerIsBetter, unit]) => ({ key, label, shortLabel, lowerIsBetter, unit, metric: metricFor(latest, key), previous: metricFor(previous, key) })).filter((row) => hasMetric(row.metric));
+  return <div className={`diagnostic-overview${compact ? " diagnostic-overview-compact" : ""}`}><strong>Leistungsdiagnostik{latest?.ageGroup ? ` · ${latest.ageGroup}` : ""}{previous?.ageGroup ? ` ↔ ${previous.ageGroup}` : ""}</strong>{rows.length ? rows.map((row) => <div key={row.key}><span className={`diagnostic-dot ${diagnosticStatus(row.metric)}`} aria-label={`${row.label}: ${diagnosticStatus(row.metric)}`} /><span>{compact ? row.shortLabel : row.label}{bestDisciplineKeys.has(row.key) && <span className="diagnostic-crown" title="Bester Wert im Team" aria-label="Bester Wert im Team">👑</span>}</span><Trend current={row.metric?.best ?? null} previous={row.previous?.best ?? null} lowerIsBetter={row.lowerIsBetter} unit={row.unit} /></div>) : <p>Noch keine Messung erfasst.</p>}</div>;
+}
+
+function DiagnosticMetricRow({ label, metric, unit, previous, lowerIsBetter, best }: { label: string; metric: DiagnosticMetric; unit: string; previous: number | null; lowerIsBetter: boolean; best?: boolean }) {
+  return <div><span className="diagnostic-detail-label"><span className={`diagnostic-dot ${diagnosticStatus(metric)}`} /><strong>{label}{best && <span className="diagnostic-crown" title="Bester Wert im Team">👑</span>}</strong><small>{metric.attempts.length ? `${metric.attempts.map((attempt, index) => `V${index + 1}: ${attempt ?? "—"}`).join(" · ")} · ` : ""}{metric.percentile === null ? "" : `PR ${Math.round(metric.percentile * 100)}% · `}{metric.category ?? ""}</small></span><b>{metric.best ?? "—"}{metric.best !== null && unit ? ` ${unit}` : ""}<small>{metric.rating ?? ""}</small><Trend current={metric.best} previous={previous} lowerIsBetter={lowerIsBetter} unit={unit} /></b></div>;
+}
+
+function DiagnosticDetailsDialog({ profile, history, bestDisciplineKeys, onClose, onEdit }: { profile: Profile; history: Diagnostic[]; bestDisciplineKeys: Set<DiagnosticDisciplineKey>; onClose: () => void; onEdit: () => void }) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
-  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="diagnostic-details-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="coach-modal diagnostic-details-dialog"><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">LEISTUNGSDIAGNOSTIK</p><h2 id="diagnostic-details-title">{profile.firstName}</h2>{history.length ? <div className="diagnostic-detail-list">{history.map((diagnostic, index) => <DiagnosticDetailRecord key={diagnostic.id} diagnostic={diagnostic} previous={history[index + 1]} />)}</div> : <p className="history-empty">Noch keine Leistungsdiagnostik erfasst.</p>}<div className="modal-actions"><button className="text-button" type="button" onClick={onClose}>Schließen</button><button className="primary-button" type="button" onClick={onEdit}>Diagnostik erfassen</button></div></section></div>;
+  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="diagnostic-details-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="coach-modal diagnostic-details-dialog"><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">LEISTUNGSDIAGNOSTIK</p><h2 id="diagnostic-details-title">{profile.firstName}</h2>{history.length ? <div className="diagnostic-detail-list">{history.map((diagnostic, index) => <DiagnosticDetailRecord key={diagnostic.id} diagnostic={diagnostic} previous={history[index + 1]} bestDisciplineKeys={index === 0 ? bestDisciplineKeys : new Set()} />)}</div> : <p className="history-empty">Noch keine Leistungsdiagnostik erfasst.</p>}<div className="modal-actions"><button className="text-button" type="button" onClick={onClose}>Schließen</button><button className="primary-button" type="button" onClick={onEdit}>Diagnostik erfassen</button></div></section></div>;
 }
 
-function DiagnosticDetailRecord({ diagnostic, previous }: { diagnostic: Diagnostic; previous?: Diagnostic }) {
-  return <section className="diagnostic-detail-record"><div className="diagnostic-detail-record-head"><strong>{diagnostic.ageGroup || "Leistungsdiagnostik"}</strong><time>{diagnostic.date}</time></div>{diagnostic.metrics ? <><DiagnosticMetricRow label="10 m Sprint" metric={diagnostic.metrics.sprint10} unit="s" previous={previous?.metrics?.sprint10?.best ?? null} /><DiagnosticMetricRow label="20 m Sprint" metric={diagnostic.metrics.sprint20} unit="s" previous={previous?.metrics?.sprint20?.best ?? null} /><DiagnosticMetricRow label="Laufgewandtheit" metric={diagnostic.metrics.agility} unit="s" previous={previous?.metrics?.agility?.best ?? null} /><DiagnosticMetricRow label="Dribbling" metric={diagnostic.metrics.dribbling} unit="s" previous={previous?.metrics?.dribbling?.best ?? null} /><div><span><strong>Shuttle Run</strong><small>Level {diagnostic.metrics.shuttleRun.level ?? "—"}</small></span><b>{diagnostic.metrics.shuttleRun.rating ?? "—"}</b></div><div><span><strong>Standweitsprung</strong><small>{diagnostic.metrics.jump.attempts.map((attempt, index) => `V${index + 1}: ${attempt ?? "—"}`).join(" · ")}</small></span><b>{diagnostic.metrics.jump.best ?? "—"} m<small>{diagnostic.metrics.jump.rating ?? ""}</small></b></div></> : <>{([['5 m Sprint', diagnostic.sprint5, previous?.sprint5, 's'], ['10 m Sprint', diagnostic.sprint10, previous?.sprint10, 's'], ['20 m Sprint', diagnostic.sprint20, previous?.sprint20, 's'], ['Agility', diagnostic.agility, previous?.agility, 's'], ['Ausdauer', diagnostic.endurance, previous?.endurance, ''], ['Sprungkraft', diagnostic.jump, previous?.jump, 'cm']] as const).map(([label, value, before, unit]) => <div key={label}><span><strong>{label}</strong></span><b>{value ?? "—"}{value !== null ? ` ${unit}` : ""}</b><Delta current={value} previous={before ?? null} lowerIsBetter={!['Ausdauer', 'Sprungkraft'].includes(label)} /></div>)}</>}</section>;
+function DiagnosticDetailRecord({ diagnostic, previous, bestDisciplineKeys }: { diagnostic: Diagnostic; previous?: Diagnostic; bestDisciplineKeys: Set<DiagnosticDisciplineKey> }) {
+  const rows = ([
+    ["sprint10", "10 m Sprint", "s", true], ["sprint20", "20 m Sprint", "s", true], ["agility", "Laufgewandtheit", "s", true], ["dribbling", "Dribbling", "s", true], ["shuttleRun", "Shuttle Run", "", false], ["jump", "Standweitsprung", "m", false],
+  ] as const).map(([key, label, unit, lowerIsBetter]) => ({ key, label, unit, lowerIsBetter, metric: metricFor(diagnostic, key), previous: metricFor(previous, key) })).filter((row) => hasMetric(row.metric));
+  return <section className="diagnostic-detail-record"><div className="diagnostic-detail-record-head"><strong>{diagnostic.ageGroup || "Leistungsdiagnostik"}</strong><time>{diagnostic.date}</time></div>{diagnostic.metrics ? rows.map((row) => <DiagnosticMetricRow key={row.key} label={row.label} metric={row.metric!} unit={row.unit} previous={row.previous?.best ?? null} lowerIsBetter={row.lowerIsBetter} best={bestDisciplineKeys.has(row.key)} />) : <>{([['5 m Sprint', diagnostic.sprint5, previous?.sprint5, 's'], ['10 m Sprint', diagnostic.sprint10, previous?.sprint10, 's'], ['20 m Sprint', diagnostic.sprint20, previous?.sprint20, 's'], ['Agility', diagnostic.agility, previous?.agility, 's'], ['Ausdauer', diagnostic.endurance, previous?.endurance, ''], ['Sprungkraft', diagnostic.jump, previous?.jump, 'cm']] as const).map(([label, value, before, unit]) => <div key={label}><span><strong>{label}</strong></span><b>{value ?? "—"}{value !== null ? ` ${unit}` : ""}</b><Trend current={value} previous={before ?? null} lowerIsBetter={!['Ausdauer', 'Sprungkraft'].includes(label)} unit={unit} /></div>)}</>}</section>;
 }
 
 function Delta({ current, previous, lowerIsBetter }: { current: number | null; previous: number | null; lowerIsBetter: boolean }) {
