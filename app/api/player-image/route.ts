@@ -56,3 +56,29 @@ export async function GET(request: Request) {
     },
   });
 }
+
+export async function POST(request: Request) {
+  if (!(await isAuthenticated())) return new Response(null, { status: 401 });
+
+  const form = await request.formData().catch(() => null);
+  const name = form?.get("name");
+  const file = form?.get("file");
+  const slug = slugify(typeof name === "string" ? name : "");
+  if (!slug || !(file instanceof File) || file.type !== "image/webp" || file.size < 1 || file.size > 5_000_000) {
+    return Response.json({ error: "Erlaubt ist nur eine WebP-Datei bis 5 MB." }, { status: 400 });
+  }
+
+  const { url, key } = await config();
+  if (!url || !key) return Response.json({ error: "Supabase ist nicht verbunden." }, { status: 503 });
+
+  const response = await fetch(
+    `${url}/storage/v1/object/player-images/${encodeURIComponent(slug)}.webp`,
+    {
+      method: "POST",
+      headers: storageHeaders(key, { "content-type": "image/webp", "x-upsert": "true" }),
+      body: await file.arrayBuffer(),
+    },
+  );
+  if (!response.ok) return Response.json({ error: "Bild konnte nicht in Supabase gespeichert werden." }, { status: 502 });
+  return Response.json({ uploaded: true, name: slug });
+}
