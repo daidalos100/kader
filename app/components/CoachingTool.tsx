@@ -422,7 +422,8 @@ export default function CoachingTool() {
     eligibleEventLineupIds.forEach((lineupId) => {
       const used = new Set<string>();
       Object.values(eventLineups[lineupId] ?? {}).flat().forEach((entry) => {
-        const player = entry.id ? profiles.find((item) => item.id === entry.id) : profiles.find((item) => item.firstName.localeCompare(entry.firstName?.trim() ?? "", "de", { sensitivity: "base" }) === 0);
+        const player = profiles.find((item) => item.id === entry.id)
+          ?? profiles.find((item) => item.firstName.localeCompare(entry.firstName?.trim() ?? "", "de", { sensitivity: "base" }) === 0);
         if (player) used.add(player.id);
       });
       used.forEach((id) => { counts[id] = (counts[id] ?? 0) + 1; });
