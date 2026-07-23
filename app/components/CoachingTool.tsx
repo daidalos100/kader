@@ -28,7 +28,18 @@ type Diagnostic = {
   agility: number | null;
   endurance: number | null;
   jump: number | null;
+  source?: string;
+  ageGroup?: string;
+  metrics?: {
+    sprint10: DiagnosticMetric;
+    sprint20: DiagnosticMetric;
+    agility: DiagnosticMetric;
+    dribbling: DiagnosticMetric;
+    shuttleRun: { level: number | null; rating: string | null };
+    jump: { attempts: Array<number | string | null>; best: number | null; rating: string | null };
+  };
 };
+type DiagnosticMetric = { attempts: Array<number | string | null>; best: number | null; percentile: number | null; category: string | null; rating: string | null };
 type CoachingState = {
   roster: string[];
   profiles: Record<string, Partial<Profile>>;
@@ -42,7 +53,6 @@ type HistoryEntry = { id: number; scope: string; record_key: string; revision: n
 
 const positionOptions = ["TW", "IV", "LV", "RV", "ZDM", "ZM", "LF", "RF", "ST"];
 const emptyState: CoachingState = { roster: [], profiles: {}, attendance: {}, matches: {}, diagnostics: {}, tactics: {} };
-
 function playerId(name: string) {
   return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "-");
 }
@@ -137,7 +147,7 @@ export default function CoachingTool() {
       fetch("/api/coaching-state", { cache: "no-store" }).then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Daten konnten nicht geladen werden.");
-        return data as { state: unknown; revisions?: Record<string, number>; migrationRequired?: boolean };
+        return data as { state: unknown; revisions?: Record<string, number>; migrationRequired?: boolean; connected?: boolean };
       }),
       fetch("/api/lineup?lineupId=default", { cache: "no-store" }).then(async (response) => {
         if (!response.ok) return [] as string[];
@@ -148,8 +158,10 @@ export default function CoachingTool() {
       .then(([calendarEvents, coaching, lineupNames]) => {
         if (cancelled) return;
         setEvents(calendarEvents);
-        setState(normalizeState(coaching.state, lineupNames));
-        setRevisions(coaching.revisions ?? {});
+        const normalized = normalizeState(coaching.state, lineupNames);
+        setState(normalized);
+        const nextRevisions = coaching.revisions ?? {};
+        setRevisions(nextRevisions);
         setMigrationRequired(Boolean(coaching.migrationRequired));
       })
       .catch((error: Error) => {
@@ -586,7 +598,11 @@ function AttendancePanel({ event, profiles, attendance, onSet, onAll }: { event:
 
 function PlayerCard({ profile, flipped, appearances, goals, assists, participation, history, onFlip, onEdit, onDiagnostic }: { profile: Profile; flipped: boolean; appearances: number; goals: number; assists: number; participation: number | null; history: Diagnostic[]; onFlip: () => void; onEdit: () => void; onDiagnostic: () => void }) {
   const latest = history[0]; const previous = history[1];
-  return <article className={`fc-card${flipped ? " flipped" : ""}`}><div className="fc-card-inner"><div className="fc-face fc-front"><button className="card-flip-area" onClick={onFlip} aria-label={`${profile.firstName}: Leistungsseite anzeigen`}><div className="shirt-number">{profile.shirtNumber || "—"}</div><Image src={`/api/player-image?name=${encodeURIComponent(profile.firstName)}`} alt={profile.firstName} width={260} height={260} unoptimized /><div className="fc-name">{profile.firstName}</div><div className="fc-positions"><strong>{profile.primaryPosition || "POS"}</strong><span>{profile.secondaryPosition || "—"}</span></div><div className="fc-foot">Starker Fuß <strong>{{ left: "Links", right: "Rechts", both: "Beide", "": "—" }[profile.strongFoot]}</strong></div><p>{profile.personality || "Spielerpersönlichkeit noch nicht ergänzt."}</p></button><button className="card-edit" onClick={onEdit}>Profil bearbeiten</button></div><div className="fc-face fc-back"><button className="card-flip-area" onClick={onFlip} aria-label={`${profile.firstName}: Profilseite anzeigen`}><p className="section-index">SAISONWERTE</p><h3>{profile.firstName}</h3><div className="fc-metrics"><div><strong>{appearances}</strong><span>Einsätze</span></div><div><strong>{goals}</strong><span>Tore</span></div><div><strong>{assists}</strong><span>Assists</span></div><div><strong>{participation === null ? "—" : `${participation}%`}</strong><span>Training</span></div></div><div className="diagnostic-mini"><strong>Leistungsdiagnostik</strong>{latest ? <>{([['5 m', latest.sprint5, previous?.sprint5, 's'], ['10 m', latest.sprint10, previous?.sprint10, 's'], ['20 m', latest.sprint20, previous?.sprint20, 's'], ['Agility', latest.agility, previous?.agility, 's'], ['Ausdauer', latest.endurance, previous?.endurance, ''], ['Sprung', latest.jump, previous?.jump, 'cm']] as const).map(([label, value, before, unit]) => <div key={label}><span>{label}</span><b>{value ?? "—"}{value !== null ? unit : ""}</b><Delta current={value} previous={before ?? null} lowerIsBetter={label !== "Ausdauer" && label !== "Sprung"} /></div>)}</> : <p>Noch keine Messung erfasst.</p>}</div></button><button className="card-edit" onClick={onDiagnostic}>Diagnostik erfassen</button></div></div></article>;
+  return <article className={`fc-card${flipped ? " flipped" : ""}`}><div className="fc-card-inner"><div className="fc-face fc-front"><button className="card-flip-area" onClick={onFlip} aria-label={`${profile.firstName}: Leistungsseite anzeigen`}><div className="shirt-number">{profile.shirtNumber || "—"}</div><Image src={`/api/player-image?name=${encodeURIComponent(profile.firstName)}`} alt={profile.firstName} width={260} height={260} unoptimized /><div className="fc-name">{profile.firstName}</div><div className="fc-positions"><strong>{profile.primaryPosition || "POS"}</strong><span>{profile.secondaryPosition || "—"}</span></div><div className="fc-foot">Starker Fuß <strong>{{ left: "Links", right: "Rechts", both: "Beide", "": "—" }[profile.strongFoot]}</strong></div><p>{profile.personality || "Spielerpersönlichkeit noch nicht ergänzt."}</p></button><button className="card-edit" onClick={onEdit}>Profil bearbeiten</button></div><div className="fc-face fc-back"><button className="card-flip-area" onClick={onFlip} aria-label={`${profile.firstName}: Profilseite anzeigen`}><p className="section-index">SAISONWERTE</p><h3>{profile.firstName}</h3><div className="fc-metrics"><div><strong>{appearances}</strong><span>Einsätze</span></div><div><strong>{goals}</strong><span>Tore</span></div><div><strong>{assists}</strong><span>Assists</span></div><div><strong>{participation === null ? "—" : `${participation}%`}</strong><span>Training</span></div></div><div className="diagnostic-mini"><strong>Leistungsdiagnostik {latest?.ageGroup ? `· ${latest.ageGroup}` : ""}</strong>{latest?.metrics ? <><DiagnosticMetricRow label="10 m Sprint" metric={latest.metrics.sprint10} unit="s" previous={previous?.metrics?.sprint10?.best ?? null} /><DiagnosticMetricRow label="20 m Sprint" metric={latest.metrics.sprint20} unit="s" previous={previous?.metrics?.sprint20?.best ?? null} /><DiagnosticMetricRow label="Laufgewandtheit" metric={latest.metrics.agility} unit="s" previous={previous?.metrics?.agility?.best ?? null} /><DiagnosticMetricRow label="Dribbling" metric={latest.metrics.dribbling} unit="s" previous={previous?.metrics?.dribbling?.best ?? null} /><div><span><strong>Shuttle Run</strong><small>Level {latest.metrics.shuttleRun.level ?? "—"}</small></span><b>{latest.metrics.shuttleRun.rating ?? "—"}</b><em /></div><div><span><strong>Standweitsprung</strong><small>{latest.metrics.jump.attempts.map((attempt, index) => `V${index + 1}: ${attempt ?? "—"}`).join(" · ")}</small></span><b>{latest.metrics.jump.best ?? "—"} m<small>{latest.metrics.jump.rating ?? ""}</small></b><Delta current={latest.metrics.jump.best} previous={previous?.metrics?.jump?.best ?? null} lowerIsBetter={false} /></div></> : latest ? <>{([['5 m', latest.sprint5, previous?.sprint5, 's'], ['10 m', latest.sprint10, previous?.sprint10, 's'], ['20 m', latest.sprint20, previous?.sprint20, 's'], ['Agility', latest.agility, previous?.agility, 's'], ['Ausdauer', latest.endurance, previous?.endurance, ''], ['Sprung', latest.jump, previous?.jump, 'cm']] as const).map(([label, value, before, unit]) => <div key={label}><span>{label}</span><b>{value ?? "—"}{value !== null ? unit : ""}</b><Delta current={value} previous={before ?? null} lowerIsBetter={label !== "Ausdauer" && label !== "Sprung"} /></div>)}</> : <p>Noch keine Messung erfasst.</p>}{latest?.source && <small className="diagnostic-source">Quelle: Excel-Import · Werte vom {latest.date}</small>}</div></button><button className="card-edit" onClick={onDiagnostic}>Diagnostik erfassen</button></div></div></article>;
+}
+
+function DiagnosticMetricRow({ label, metric, unit, previous }: { label: string; metric: DiagnosticMetric; unit: string; previous: number | null }) {
+  return <div><span><strong>{label}</strong><small>{metric.attempts.map((attempt, index) => `V${index + 1}: ${attempt ?? "—"}`).join(" · ")} · PR {metric.percentile === null ? "—" : `${Math.round(metric.percentile * 100)}%`} · {metric.category ?? "—"}</small></span><b>{metric.best ?? "—"}{metric.best !== null ? ` ${unit}` : ""}<small>{metric.rating ?? ""}</small></b><Delta current={metric.best} previous={previous} lowerIsBetter /></div>;
 }
 
 function Delta({ current, previous, lowerIsBetter }: { current: number | null; previous: number | null; lowerIsBetter: boolean }) {
