@@ -13,7 +13,7 @@ test("mobile and accessibility safeguards stay present", async () => {
   ]);
   for (const marker of [
     "@media (max-width: 820px)", "@media (max-width: 560px)", "@media (max-width: 380px)",
-    "prefers-reduced-motion", "focus-visible", "safe-area-inset-left", "pointer: coarse", "overscroll-behavior-x: contain", "min-height: 44px",
+    "prefers-reduced-motion", "focus-visible", "safe-area-inset-left", "pointer: coarse", "overscroll-behavior-x: contain", "min-height: 44px", "calendar-event-dialog",
   ]) assert.match(css, new RegExp(marker.replace(/[()]/g, "\\$&")));
   for (const marker of ["aria-live=\"polite\"", "<dialog", "aria-labelledby", "role=\"status\""]) {
     assert.ok(component.includes(marker), `missing ${marker}`);
@@ -89,6 +89,16 @@ test("appearances are derived from saved matchday lineups", async () => {
   }
   assert.ok(route.includes('params.get("eventLineups")'));
   assert.ok(route.includes("lineup_id=like.event-*"));
+});
+
+test("calendar keeps past events available and stores local event overrides", async () => {
+  const [calendar, component, route, migration] = await Promise.all([
+    source("app/lib/calendar.ts"), source("app/components/CoachingTool.tsx"), source("app/api/coaching-state/route.ts"), source("supabase/phase5-calendar-overrides.sql"),
+  ]);
+  assert.ok(calendar.includes("24 * 365"));
+  for (const marker of ["Vergangene Termine", "calendarOverrides", "Termin bearbeiten", "Google-Kalender bleibt unverändert"]) assert.ok(component.includes(marker), `missing ${marker}`);
+  assert.ok(route.includes('"calendar_event"'));
+  assert.ok(migration.includes("calendar_event"));
 });
 
 test("diagnostic cards support imported metrics without embedding player data", async () => {
