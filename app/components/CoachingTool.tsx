@@ -764,7 +764,8 @@ function HistoryPanel({ onRestored }: { onRestored: () => Promise<void> }) {
 }
 
 function EventCard({ event, active, anchor, onOpen }: { event: CalendarEvent; active?: boolean; anchor?: boolean; onOpen: (event: CalendarEvent, target: "attendance" | "lineup" | "stats") => void }) {
-  return <article id={anchor ? "next-calendar-event" : undefined} className={`event-card type-${event.type}${active ? " active" : ""}${anchor ? " calendar-next-anchor" : ""}`}><div className="event-card-top"><span>{anchor ? "Nächster Termin" : eventLabel(event.type)}</span><time>{formatDate(event.start)}</time></div><h3>{event.title}</h3><p>{event.location || "Ort noch offen"}</p><button type="button" onClick={() => onOpen(event, "attendance")}>Teilnahme eintragen →</button></article>;
+  const hasLineup = event.type === "game" || event.type === "tournament";
+  return <article id={anchor ? "next-calendar-event" : undefined} className={`event-card type-${event.type}${active ? " active" : ""}${anchor ? " calendar-next-anchor" : ""}`}><div className="event-card-top"><span>{anchor ? "Nächster Termin" : eventLabel(event.type)}</span><time>{formatDate(event.start)}</time></div><h3>{event.title}</h3><p>{event.location || "Ort noch offen"}</p><div className="event-card-actions">{hasLineup && <button type="button" className="primary-action" onClick={() => onOpen(event, "lineup")}>Kader planen →</button>}<button type="button" onClick={() => onOpen(event, "attendance")}>Teilnahme eintragen →</button></div></article>;
 }
 
 function AttendancePanel({ event, profiles, attendance, reasons, onSet, onAll, onEdit }: { event: CalendarEvent; profiles: Profile[]; attendance: Record<string, AttendanceStatus>; reasons: Record<string, AbsenceReason>; onSet: (eventId: string, id: string, status: AttendanceStatus, reason?: AbsenceReason) => void; onAll: (eventId: string) => void; onEdit: () => void }) {
