@@ -315,11 +315,11 @@ export default function CoachingTool() {
 
   async function recordGoal(eventId: string, scorerId: string, assistId: string | null) {
     const current = state.matches[eventId] ?? { result: "", entries: {}, goalEvents: [] };
-    const scorer = current.entries[scorerId] ?? { appearance: true, goals: 0, assists: 0 };
-    const assist = assistId ? current.entries[assistId] ?? { appearance: true, goals: 0, assists: 0 } : null;
+    const scorer = current.entries[scorerId] ?? { appearance: false, goals: 0, assists: 0 };
+    const assist = assistId ? current.entries[assistId] ?? { appearance: false, goals: 0, assists: 0 } : null;
     const goal: GoalEvent = { id: crypto.randomUUID(), scorerId, assistId, createdAt: new Date().toISOString() };
-    const entries = { ...current.entries, [scorerId]: { ...scorer, appearance: true, goals: scorer.goals + 1 } };
-    if (assistId && assist) entries[assistId] = { ...assist, appearance: true, assists: assist.assists + 1 };
+    const entries = { ...current.entries, [scorerId]: { ...scorer, goals: scorer.goals + 1 } };
+    if (assistId && assist) entries[assistId] = { ...assist, assists: assist.assists + 1 };
     const next = { ...current, entries, goalEvents: [...(current.goalEvents ?? []), goal] };
     const operations = [operation("match_goal", `${eventId}:${goal.id}`, goal), operation("match_entry", `${eventId}:${scorerId}`, entries[scorerId])];
     if (assistId) operations.push(operation("match_entry", `${eventId}:${assistId}`, entries[assistId]));
