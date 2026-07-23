@@ -128,12 +128,15 @@ function validOperation(value: unknown): value is Operation {
   }
   if (value.scope === "tactic") {
     if (!["attack", "defense", "corner"].includes(value.key) || !isRecord(value.value)) return false;
-    if (!isRecord(value.value.positions) || !isRecord(value.value.ball)) return false;
+    const tactic = value.value;
+    const tacticPositions = tactic.positions;
+    const tacticBall = tactic.ball;
+    if (!isRecord(tacticPositions) || !isRecord(tacticBall)) return false;
     const validPoint = (point: unknown) => isRecord(point) &&
       typeof point.x === "number" && Number.isFinite(point.x) && point.x >= 0 && point.x <= 100 &&
       typeof point.y === "number" && Number.isFinite(point.y) && point.y >= 0 && point.y <= 100;
-    return ["st", "lf", "rf", "zm", "zdm", "lv", "iv", "rv", "tw"].every((id) => validPoint(value.value.positions[id])) &&
-      validPoint(value.value.ball);
+    return ["st", "lf", "rf", "zm", "zdm", "lv", "iv", "rv", "tw"].every((id) => validPoint(tacticPositions[id])) &&
+      validPoint(tacticBall);
   }
   return false;
 }
