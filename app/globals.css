@@ -464,7 +464,9 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .diagnostic-dot.mid-good { background: #a6d95c; box-shadow: 0 0 0 3px rgba(166,217,92,.14); }
 .diagnostic-dot.average { background: #e7c84c; box-shadow: 0 0 0 3px rgba(231,200,76,.14); }
 .diagnostic-dot.below { background: #f08245; box-shadow: 0 0 0 3px rgba(240,130,69,.14); }
+.diagnostic-dot.critical { background: #ef161c; box-shadow: 0 0 0 3px rgba(239,22,28,.16); }
 .diagnostic-dot.bad { background: #7b171c; box-shadow: 0 0 0 3px rgba(123,23,28,.18); }
+.diagnostic-crown { margin-left: 3px; font-size: .8rem; }
 .diagnostic-source { margin-top: 8px; color: #777a80; font-size: .5rem; }
 .diagnostic-details-dialog { width: min(560px, calc(100vw - 28px)); }
 .diagnostic-detail-list { display: grid; gap: 18px; max-height: min(68vh, 680px); overflow-y: auto; padding-right: 5px; }
@@ -487,8 +489,9 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .stats-table td { padding: 13px 15px; border-top: 1px solid rgba(244,243,239,.09); color: #c7c7c8; }
 .stats-table td:first-child { display: flex; align-items: center; gap: 10px; color: var(--white); }
 .match-editor { position: sticky; top: 110px; padding: 24px; border: 1px solid rgba(244,243,239,.15); background: #101115; }
-.match-editor > label, .match-panel > label, .coach-modal label { display: grid; gap: 7px; color: #8f9197; font-size: .62rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-.match-editor select, .match-panel input, .coach-modal input, .coach-modal select, .coach-modal textarea { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid rgba(244,243,239,.2); border-radius: 0; outline: 0; background: #090a0d; color: var(--white); }
+.match-editor > label, .match-panel > label, .coach-modal label { display: grid; gap: 7px; color: #c4c5c9; font-size: .62rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.match-editor select, .match-panel input, .coach-modal input, .coach-modal select, .coach-modal textarea { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid rgba(244,243,239,.38); border-radius: 0; outline: 0; background: #090a0d; color: var(--white); }
+.coach-modal input::placeholder, .coach-modal textarea::placeholder { color: #aeb0b6; opacity: 1; }
 .match-editor select:focus, .match-panel input:focus, .coach-modal input:focus, .coach-modal select:focus, .coach-modal textarea:focus { border-color: var(--red); }
 .match-panel { margin-top: 30px; }
 .match-panel h2 { margin: 8px 0 20px; font-size: 1.5rem; line-height: 1.05; text-transform: uppercase; }
@@ -498,10 +501,10 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .match-player-list .appearance { display: flex; align-items: center; gap: 8px; min-height: 42px; color: var(--white); font-size: .78rem; text-transform: none; }
 .match-player-list .appearance input { width: 18px; min-height: 18px; accent-color: var(--red); }
 .match-player-list input { min-height: 38px; padding: 5px 8px; }
-.modal-backdrop { position: fixed; z-index: 50; inset: 0; display: grid; width: 100%; max-width: none; height: 100%; max-height: none; place-items: center; overflow-y: auto; margin: 0; padding: 20px; border: 0; background: rgba(2,3,5,.82); backdrop-filter: blur(8px); }
+.modal-backdrop { position: fixed; z-index: 50; inset: 0; display: grid; width: 100%; max-width: none; height: 100%; max-height: none; place-items: center; overflow-y: auto; margin: 0; padding: 20px; border: 0; background: rgba(2,3,5,.82); color: var(--white); backdrop-filter: blur(8px); }
 .modal-backdrop::backdrop { background: rgba(2,3,5,.82); }
-.coach-modal { position: relative; width: min(680px, 100%); padding: clamp(26px, 5vw, 46px); border: 1px solid rgba(244,243,239,.2); background: #101115; box-shadow: 0 30px 100px #000; }
-.coach-modal h2 { margin: 9px 0 28px; font-size: clamp(2.2rem, 6vw, 4rem); line-height: .9; text-transform: uppercase; }
+.coach-modal { position: relative; width: min(680px, 100%); padding: clamp(26px, 5vw, 46px); border: 1px solid rgba(244,243,239,.34); background: #101115; color: var(--white); box-shadow: 0 30px 100px #000; }
+.coach-modal h2 { margin: 9px 0 28px; color: var(--white); font-size: clamp(2.2rem, 6vw, 4rem); line-height: .9; text-transform: uppercase; }
 .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
 .form-grid .wide { grid-column: 1 / -1; }
 .coach-modal textarea { resize: vertical; }
