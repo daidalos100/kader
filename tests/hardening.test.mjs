@@ -102,11 +102,21 @@ test("calendar keeps its chronology from 07.07.2026 and stores local event overr
 });
 
 test("diagnostic cards support imported metrics without embedding player data", async () => {
-  const component = await source("app/components/CoachingTool.tsx");
+  const [component, route] = await Promise.all([
+    source("app/components/CoachingTool.tsx"), source("app/api/coaching-state/route.ts"),
+  ]);
   for (const marker of ["DiagnosticMetric", "metrics", "dribbling", "shuttleRun", "Standweitsprung"]) {
     assert.ok(component.includes(marker), `missing ${marker}`);
   }
   assert.ok(!component.includes("excel-u13-2026-"), "private player measurements must not be embedded in source code");
+  assert.ok(route.includes("diagnostic.deleted !== true"));
+});
+
+test("statistics show percentage appearances and event-level details", async () => {
+  const component = await source("app/components/CoachingTool.tsx");
+  for (const marker of ["StatDetailsDialog", "appearanceEvents", "trainingEvents", "`${appearanceRate}%`", "stats-value-button"]) {
+    assert.ok(component.includes(marker), `missing ${marker}`);
+  }
 });
 
 test("player card back keeps details accessible on constrained screens", async () => {
