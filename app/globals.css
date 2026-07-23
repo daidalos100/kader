@@ -572,7 +572,7 @@ body.matchday-focus .matchday-view { padding-top: 14px; }
 body.matchday-focus .matchday-heading { position: sticky; z-index: 15; top: 0; padding-top: 8px; background: rgba(8,9,12,.96); backdrop-filter: blur(14px); }
 body.matchday-focus .matchday-focus-button { border-color: rgba(244,243,239,.5); background: transparent; color: var(--white); }
 body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-focus-button:focus-visible { border-color: var(--white); background: rgba(244,243,239,.12); }
-.stats-table-wrap { overflow-x: auto; border: 1px solid rgba(244,243,239,.15); }
+.stats-table-wrap { overflow-x: auto; overscroll-behavior-x: contain; border: 1px solid rgba(244,243,239,.15); -webkit-overflow-scrolling: touch; }
 .stats-table { width: 100%; border-collapse: collapse; background: #101115; }
 .stats-table th { padding: 15px; color: #777980; font-size: .61rem; letter-spacing: .08em; text-align: left; text-transform: uppercase; }
 .stats-table td { padding: 13px 15px; border-top: 1px solid rgba(244,243,239,.09); color: #c7c7c8; }
@@ -755,7 +755,7 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
   .coach-brand img { width: 44px; height: 44px; }
   .coach-brand small { font-size: .5rem; }
   .coach-brand strong { font-size: 1rem; }
-  .coach-header nav { margin-inline: -12px; padding-inline: 5px; }
+  .coach-header nav { margin-inline: -12px; padding-inline: 5px; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
   .coach-header nav button { padding: 11px 9px; font-size: .57rem; }
   .coach-header-actions .logout-button { padding: 8px; }
   .overview-metrics, .event-strip { grid-template-columns: 1fr 1fr; }
@@ -768,7 +768,8 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
   .detail-head { align-items: flex-start; flex-direction: column; }
   .attendance-row { align-items: flex-start; flex-direction: column; }
   .attendance-options { width: 100%; }
-  .attendance-options button { flex: 1; justify-content: center; min-width: 0; padding-inline: 4px; font-size: .48rem; }
+  .attendance-options button { flex: 1; justify-content: center; min-width: 0; min-height: 44px; padding-inline: 4px; font-size: .52rem; }
+  .attendance-reason-select { width: 100%; min-height: 44px; }
   .module-switcher { align-items: flex-start; flex-direction: column; }
   .lineup-module .planner-intro { padding-top: 25px; }
   .player-card-grid { grid-template-columns: 1fr; }
@@ -796,6 +797,7 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
   .matchday-step h2 { margin-bottom: 18px; }
   .matchday-step.start > .section-index, .matchday-step.start > h2 { display: none; }
   .matchday-start { min-height: 210px; }
+  .matchday-result { width: 100%; }
   .matchday-player-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .matchday-player-button { min-height: 106px; grid-template-columns: 1fr; grid-template-rows: auto auto auto; justify-items: center; gap: 6px; padding: 10px 6px; text-align: center; }
   .matchday-player-button img { grid-row: auto; width: 58px; height: 58px; margin: 0; }
