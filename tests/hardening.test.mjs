@@ -78,3 +78,12 @@ test("diagnostic cards support imported metrics without embedding player data", 
   assert.ok(!component.includes("excel-u13-2026-"), "private player measurements must not be embedded in source code");
 });
 
+test("player card back keeps details accessible on constrained screens", async () => {
+  const [css, component] = await Promise.all([
+    source("app/globals.css"), source("app/components/CoachingTool.tsx"),
+  ]);
+  for (const marker of ["Details anzeigen", "DiagnosticDetailsDialog", "diagnostic-details-dialog", "overflow-y: auto", ".fc-card { height: 690px"]) {
+    assert.ok(css.includes(marker) || component.includes(marker), `missing ${marker}`);
+  }
+});
+
