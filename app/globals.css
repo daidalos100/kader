@@ -25,7 +25,7 @@ body {
 }
 
 button, input { font: inherit; }
-button { color: inherit; }
+button { color: inherit; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
 .app-shell {
   width: min(1320px, 100%);
@@ -405,8 +405,8 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .event-card h3 { margin: 20px 0 8px; font-size: 1.15rem; line-height: 1.15; text-transform: uppercase; }
 .event-card p { margin: 0; color: #8f9197; font-size: .78rem; }
 .event-card-actions { display: grid; justify-items: start; gap: 6px; margin-top: auto; padding-top: 18px; }
-.event-card-actions button { padding: 0; border: 0; background: transparent; color: #d5d5d3; font-size: .65rem; font-weight: 900; letter-spacing: .07em; text-transform: uppercase; cursor: pointer; }
-.event-card-actions button:hover { color: var(--red); }
+.event-card-actions button { display: inline-flex; align-items: center; min-height: 40px; padding: 0; border: 0; background: transparent; color: #d5d5d3; font-size: .65rem; font-weight: 900; letter-spacing: .07em; text-transform: uppercase; cursor: pointer; }
+.event-card-actions button:hover, .event-card-actions button:focus-visible { color: var(--red); }
 .event-card-actions .primary-action { color: var(--white); }
 .event-card-actions .primary-action:hover { color: var(--red); }
 .calendar-layout { display: grid; grid-template-columns: minmax(320px, .72fr) minmax(560px, 1.28fr); gap: 18px; align-items: start; }
@@ -432,11 +432,11 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .attendance-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 62px; padding: 9px 10px; border: 1px solid rgba(244,243,239,.12); background: #16171b; }
 .attendance-row > div:first-child { display: flex; align-items: center; gap: 10px; min-width: 125px; }
 .attendance-row img, .stats-table img { border: 1px solid rgba(244,243,239,.45); border-radius: 50%; object-fit: cover; }
-.attendance-options { display: flex; gap: 5px; }
+.attendance-options { display: flex; flex-wrap: wrap; gap: 5px; }
 .attendance-options button { display: flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 9px; border: 1px solid rgba(244,243,239,.14); background: transparent; color: #7f8187; font-size: .56rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
 .attendance-options button span { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .attendance-reason { display: block; margin-top: 3px; color: #c8c9cc; font-size: .58rem; }
-.attendance-reason-select { min-height: 34px; padding: 0 8px; border: 1px solid rgba(244,243,239,.28); background: #090a0d; color: var(--white); font-size: .58rem; }
+.attendance-reason-select { flex: 1 0 100%; min-height: 40px; padding: 0 8px; border: 1px solid rgba(244,243,239,.28); background: #090a0d; color: var(--white); font-size: .58rem; }
 .attendance-options .present.selected { border-color: #55ce75; background: rgba(85,206,117,.12); color: #79dc90; }
 .attendance-options .excused.selected { border-color: #85878d; background: rgba(133,135,141,.12); color: #b3b4b8; }
 .attendance-options .absent.selected { border-color: var(--red); background: rgba(239,22,28,.12); color: #ff777a; }
@@ -619,9 +619,9 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
 .match-player-list .appearance { display: flex; align-items: center; gap: 8px; min-height: 42px; color: var(--white); font-size: .78rem; text-transform: none; }
 .match-player-list .appearance input { width: 18px; min-height: 18px; accent-color: var(--red); }
 .match-player-list input { min-height: 38px; padding: 5px 8px; }
-.modal-backdrop { position: fixed; z-index: 50; inset: 0; display: grid; width: 100%; max-width: none; height: 100%; max-height: none; place-items: center; overflow-y: auto; margin: 0; padding: 20px; border: 0; background: rgba(2,3,5,.82); color: var(--white); backdrop-filter: blur(8px); }
+.modal-backdrop { position: fixed; z-index: 50; inset: 0; display: grid; width: 100%; max-width: none; min-height: 100dvh; max-height: none; place-items: center; overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left)); border: 0; background: rgba(2,3,5,.82); color: var(--white); backdrop-filter: blur(8px); }
 .modal-backdrop::backdrop { background: rgba(2,3,5,.82); }
-.coach-modal { position: relative; width: min(680px, 100%); padding: clamp(26px, 5vw, 46px); border: 1px solid rgba(244,243,239,.34); background: #101115; color: var(--white); box-shadow: 0 30px 100px #000; }
+.coach-modal { position: relative; width: min(680px, 100%); max-height: calc(100dvh - 40px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; padding: clamp(26px, 5vw, 46px); border: 1px solid rgba(244,243,239,.34); background: #101115; color: var(--white); box-shadow: 0 30px 100px #000; }
 .coach-modal h2 { margin: 9px 0 28px; color: var(--white); font-size: clamp(2.2rem, 6vw, 4rem); line-height: .9; text-transform: uppercase; }
 .stat-details-dialog { width: min(620px, 100%); }
 .stat-details-value { display: block; margin: -8px 0 24px; color: var(--red); font-size: clamp(2.2rem, 8vw, 4rem); font-variant-numeric: tabular-nums; }
@@ -733,7 +733,7 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
 
 :where(button, a, input, select, textarea):focus-visible { outline: 3px solid #ffeb67; outline-offset: 3px; }
 @media (pointer: coarse) {
-  :where(.coach-header nav button, .text-button, .logout-button, .history-list button, .history-toggle) { min-height: 44px; }
+  :where(.coach-header nav button, .text-button, .logout-button, .history-list button, .history-toggle, .event-card-actions button, .position-filters button, .stats-sort-button, .stats-value-button, .attendance-options button, .tactics-drawing-toolbar button, .tactics-scenarios button) { min-height: 44px; }
 }
 
 @media (max-width: 1150px) {
@@ -797,6 +797,7 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
   .lineup-module .planner-intro { padding-top: 25px; }
   .player-card-grid { grid-template-columns: 1fr; }
   .fc-card, .fc-card-inner { height: 700px; min-height: 0; }
+  .static-card, .static-card .fc-card-inner { height: 760px; }
   .static-card .fc-metrics > .season-metric { min-height: 80px; padding: 11px 10px; }
   .static-card .fc-metrics .season-metric-value { gap: 6px; }
   .static-card .season-metric-value strong { font-size: 1.3rem; }
