@@ -455,23 +455,29 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .fc-metrics div { display: grid; gap: 5px; padding: 14px; border-right: 1px solid rgba(244,243,239,.1); border-bottom: 1px solid rgba(244,243,239,.1); }
 .fc-metrics strong { font-size: 1.6rem; }
 .fc-metrics span { color: #85878d; font-size: .58rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-.diagnostic-mini { display: grid; gap: 0; margin-top: 22px; }
-.diagnostic-mini > strong { margin-bottom: 8px; font-size: .69rem; letter-spacing: .08em; text-transform: uppercase; }
-.diagnostic-mini > div { display: grid; grid-template-columns: minmax(0, 1fr) auto 64px; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(244,243,239,.08); font-size: .72rem; }
-.diagnostic-mini > div > span { display: grid; gap: 2px; min-width: 0; color: #9a9ca1; }
-.diagnostic-mini > div > span strong { color: #d9dadd; font-size: .67rem; }
-.diagnostic-mini small { display: block; overflow: hidden; color: #777a80; font-size: .53rem; font-weight: 500; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.diagnostic-overview { display: grid; gap: 0; width: 100%; margin-top: 22px; }
+.diagnostic-overview > strong { margin-bottom: 8px; font-size: .69rem; letter-spacing: .08em; text-transform: uppercase; }
+.diagnostic-overview > div { display: flex; align-items: center; gap: 9px; padding: 7px 0; border-bottom: 1px solid rgba(244,243,239,.08); color: #b4b5b9; font-size: .72rem; }
+.diagnostic-overview > p { margin: 5px 0 0; color: #777a80; font-size: .7rem; }
+.diagnostic-dot { display: block; flex: 0 0 9px; width: 9px; height: 9px; border-radius: 50%; background: #72747b; box-shadow: 0 0 0 3px rgba(114,116,123,.12); }
+.diagnostic-dot.good { background: #55ce75; box-shadow: 0 0 0 3px rgba(85,206,117,.14); }
+.diagnostic-dot.mid-good { background: #a6d95c; box-shadow: 0 0 0 3px rgba(166,217,92,.14); }
+.diagnostic-dot.average { background: #e7c84c; box-shadow: 0 0 0 3px rgba(231,200,76,.14); }
+.diagnostic-dot.below { background: #f08245; box-shadow: 0 0 0 3px rgba(240,130,69,.14); }
+.diagnostic-dot.bad { background: #7b171c; box-shadow: 0 0 0 3px rgba(123,23,28,.18); }
 .diagnostic-source { margin-top: 8px; color: #777a80; font-size: .5rem; }
 .diagnostic-details-dialog { width: min(560px, calc(100vw - 28px)); }
-.diagnostic-detail-list { display: grid; gap: 0; max-height: min(62vh, 620px); overflow-y: auto; padding-right: 5px; }
-.diagnostic-detail-list > p { margin: 0 0 12px; color: #85878d; font-size: .7rem; }
-.diagnostic-detail-list > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(244,243,239,.1); }
-.diagnostic-detail-list > div > span { display: grid; gap: 3px; }
-.diagnostic-detail-list > div strong { color: #d9dadd; }
-.diagnostic-detail-list > div b { text-align: right; }
-.diagnostic-detail-list > div small { display: block; color: #777a80; font-size: .58rem; font-weight: 500; }
+.diagnostic-detail-list { display: grid; gap: 18px; max-height: min(68vh, 680px); overflow-y: auto; padding-right: 5px; }
+.diagnostic-detail-record { display: grid; gap: 0; border-top: 1px solid rgba(244,243,239,.13); }
+.diagnostic-detail-record-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 12px 0 4px; color: #d9dadd; font-size: .75rem; }
+.diagnostic-detail-record-head time { color: #85878d; font-size: .65rem; }
+.diagnostic-detail-record > div:not(.diagnostic-detail-record-head) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(244,243,239,.1); }
+.diagnostic-detail-record > div:not(.diagnostic-detail-record-head) > span { display: grid; gap: 3px; }
+.diagnostic-detail-record strong { color: #d9dadd; }
+.diagnostic-detail-record b { text-align: right; }
+.diagnostic-detail-record small { display: block; color: #777a80; font-size: .58rem; font-weight: 500; }
 .diagnostic-details-dialog .modal-actions { display: flex; justify-content: flex-end; gap: 14px; margin-top: 18px; }
-.diagnostic-mini em { font-style: normal; text-align: right; }
+.diagnostic-detail-record em { font-style: normal; text-align: right; }
 .delta-positive { color: #55ce75; }
 .delta-negative { color: #ff6c70; }
 .stats-layout { display: grid; grid-template-columns: minmax(580px, 1fr) minmax(390px, .62fr); gap: 18px; align-items: start; }
