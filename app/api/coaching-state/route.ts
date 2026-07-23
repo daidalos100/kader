@@ -4,7 +4,7 @@ import { isAuthenticated } from "../../auth";
 import { getSupabaseConfig, supabaseHeaders } from "../../lib/supabase";
 
 const SEASON_ID = "d1-2026-27";
-const allowedScopes = new Set(["roster", "profile", "attendance", "match_meta", "match_entry", "diagnostic", "tactic"]);
+const allowedScopes = new Set(["roster", "profile", "attendance", "match_meta", "match_entry", "match_goal", "diagnostic", "tactic"]);
 
 type RecordRow = {
   scope: string;
@@ -42,7 +42,7 @@ function assembleState(rows: RecordRow[]) {
     roster: string[];
     profiles: Record<string, unknown>;
     attendance: Record<string, Record<string, unknown>>;
-    matches: Record<string, { result: string; entries: Record<string, unknown> }>;
+    matches: Record<string, { result: string; entries: Record<string, unknown>; goalEvents: unknown[] }>;
     diagnostics: Record<string, unknown[]>;
     tactics: Record<string, unknown>;
   };
@@ -61,14 +61,22 @@ function assembleState(rows: RecordRow[]) {
     }
     if (row.scope === "match_meta" && row.data && typeof row.data === "object") {
       const result = String((row.data as { result?: unknown }).result ?? "").slice(0, 20);
-      state.matches[row.record_key] ??= { result: "", entries: {} };
+      state.matches[row.record_key] ??= { result: "", entries: {}, goalEvents: [] };
       state.matches[row.record_key].result = result;
     }
     if (row.scope === "match_entry" && row.data && typeof row.data === "object") {
       const [eventId, playerId] = splitCompositeKey(row.record_key);
       if (eventId && playerId) {
-        state.matches[eventId] ??= { result: "", entries: {} };
+        state.matches[eventId] ??= { result: "", entries: {}, goalEvents: [] };
         state.matches[eventId].entries[playerId] = row.data;
+      }
+    }
+    if (row.scope === "match_goal" && row.data && typeof row.data === "object") {
+      const [eventId] = splitCompositeKey(row.record_key);
+      const goal = row.data as { deleted?: unknown };
+      if (eventId && goal.deleted !== true) {
+        state.matches[eventId] ??= { result: "", entries: {}, goalEvents: [] };
+        state.matches[eventId].goalEvents.push(row.data);
       }
     }
     if (row.scope === "diagnostic" && row.data && typeof row.data === "object") {
@@ -114,6 +122,15 @@ function validOperation(value: unknown): value is Operation {
     return isRecord(value.value) && typeof value.value.appearance === "boolean" &&
       Number.isInteger(value.value.goals) && Number(value.value.goals) >= 0 && Number(value.value.goals) <= 30 &&
       Number.isInteger(value.value.assists) && Number(value.value.assists) >= 0 && Number(value.value.assists) <= 30;
+  }
+  if (value.scope === "match_goal") {
+    if (!isRecord(value.value)) return false;
+    const goal = value.value;
+    return typeof goal.id === "string" && goal.id.length >= 8 && goal.id.length <= 80 &&
+      typeof goal.scorerId === "string" && /^[a-z0-9-]{1,80}$/.test(goal.scorerId) &&
+      (goal.assistId === null || (typeof goal.assistId === "string" && /^[a-z0-9-]{1,80}$/.test(goal.assistId))) &&
+      typeof goal.createdAt === "string" && goal.createdAt.length <= 40 &&
+      (goal.deleted === undefined || typeof goal.deleted === "boolean");
   }
   if (value.scope === "profile") {
     if (!isRecord(value.value)) return false;
@@ -229,4 +246,3 @@ export async function PATCH(request: Request) {
     return privateJson({ error: "Coaching-Daten konnten nicht gespeichert werden." }, { status: 502 });
   }
 }
-
