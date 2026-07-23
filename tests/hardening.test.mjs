@@ -70,3 +70,11 @@ test("tactics stay draggable, tied to lineups and support custom scenarios", asy
   assert.ok(route.includes("custom-[a-z0-9-]"));
 });
 
+test("diagnostic cards support imported metrics without embedding player data", async () => {
+  const component = await source("app/components/CoachingTool.tsx");
+  for (const marker of ["DiagnosticMetric", "metrics", "dribbling", "shuttleRun", "Standweitsprung"]) {
+    assert.ok(component.includes(marker), `missing ${marker}`);
+  }
+  assert.ok(!component.includes("excel-u13-2026-"), "private player measurements must not be embedded in source code");
+});
+
