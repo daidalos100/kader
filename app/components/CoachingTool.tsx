@@ -22,6 +22,7 @@ type MatchEntry = { appearance: boolean; goals: number; assists: number };
 type GoalEvent = { id: string; scorerId: string; assistId: string | null; createdAt: string; deleted?: boolean };
 type MatchData = { result: string; entries: Record<string, MatchEntry>; goalEvents?: GoalEvent[] };
 type MatchdayLineupPlayer = { player: Profile; position: string };
+type SavedLineup = Record<string, Array<{ id?: string; firstName?: string }>>;
 type Diagnostic = {
   id: string;
   date: string;
@@ -136,6 +137,7 @@ export default function CoachingTool() {
   const [newRosterName, setNewRosterName] = useState("");
   const [positionFilter, setPositionFilter] = useState("all");
   const [matchdayLineup, setMatchdayLineup] = useState<MatchdayLineupPlayer[]>([]);
+  const [eventLineups, setEventLineups] = useState<Record<string, SavedLineup>>({});
   const [referenceTime] = useState(() => Date.now());
 
   const profiles = useMemo(
@@ -151,7 +153,7 @@ export default function CoachingTool() {
     let cancelled = false;
     if (!matchdayEvent) { setMatchdayLineup([]); return; }
     fetch(`/api/lineup?lineupId=${encodeURIComponent(eventLineupId(matchdayEvent))}`, { cache: "no-store" })
-      .then(async (response) => response.ok ? await response.json() as { lineup?: Record<string, Array<{ firstName?: string }>> } : { lineup: {} })
+      .then(async (response) => response.ok ? await response.json() as { lineup?: SavedLineup } : { lineup: {} })
       .then((data) => {
         if (cancelled) return;
         const rank = ["st", "lf", "rf", "zm", "zdm", "lv", "iv", "rv", "tw"];
@@ -186,13 +188,19 @@ export default function CoachingTool() {
       }),
       fetch("/api/lineup?lineupId=default", { cache: "no-store" }).then(async (response) => {
         if (!response.ok) return [] as string[];
-        const data = await response.json() as { lineup?: Record<string, Array<{ firstName?: string }>> };
+        const data = await response.json() as { lineup?: SavedLineup };
         return [...new Set(Object.values(data.lineup ?? {}).flat().map((player) => player.firstName?.trim()).filter((name): name is string => Boolean(name)))].sort((a, b) => a.localeCompare(b, "de"));
       }),
+      fetch("/api/lineup?eventLineups=1", { cache: "no-store" }).then(async (response) => {
+        if (!response.ok) return {} as Record<string, SavedLineup>;
+        const data = await response.json() as { lineups?: Record<string, SavedLineup> };
+        return data.lineups ?? {};
+      }),
     ])
-      .then(([calendarEvents, coaching, lineupNames]) => {
+      .then(([calendarEvents, coaching, lineupNames, savedEventLineups]) => {
         if (cancelled) return;
         setEvents(calendarEvents);
+        setEventLineups(savedEventLineups);
         const normalized = normalizeState(coaching.state, lineupNames);
         setState(normalized);
         const nextRevisions = coaching.revisions ?? {};
@@ -406,20 +414,35 @@ export default function CoachingTool() {
     if (!await save({ ...state, tactics: { ...state.tactics, [id]: value } }, [operation("tactic", id, value)])) throw new Error("Taktik konnte nicht gelöscht werden.");
   }
 
+  const eligibleEventLineupIds = useMemo(() => events
+    .filter((event) => (event.type === "game" || event.type === "tournament") && new Date(event.start).getTime() >= seasonStart)
+    .map(eventLineupId), [events]);
+  const appearanceCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    eligibleEventLineupIds.forEach((lineupId) => {
+      const used = new Set<string>();
+      Object.values(eventLineups[lineupId] ?? {}).flat().forEach((entry) => {
+        const player = entry.id ? profiles.find((item) => item.id === entry.id) : profiles.find((item) => item.firstName.localeCompare(entry.firstName?.trim() ?? "", "de", { sensitivity: "base" }) === 0);
+        if (player) used.add(player.id);
+      });
+      used.forEach((id) => { counts[id] = (counts[id] ?? 0) + 1; });
+    });
+    return counts;
+  }, [eligibleEventLineupIds, eventLineups, profiles]);
+  const totalMatches = eligibleEventLineupIds.filter((lineupId) => Object.values(eventLineups[lineupId] ?? {}).some((players) => players.length > 0)).length;
   const statsRows = profiles.map((player) => {
     let appearances = 0; let goals = 0; let assists = 0; let present = 0; let recorded = 0;
     Object.values(state.matches).forEach((match) => {
       const entry = match.entries[player.id];
-      if (entry?.appearance) appearances += 1;
       goals += entry?.goals ?? 0; assists += entry?.assists ?? 0;
     });
     Object.values(state.attendance).forEach((attendance) => {
       if (attendance[player.id]) recorded += 1;
       if (attendance[player.id] === "present") present += 1;
     });
+    appearances = appearanceCounts[player.id] ?? 0;
     return { player, appearances, goals, assists, participation: recorded ? Math.round((present / recorded) * 100) : null };
   });
-  const totalMatches = Object.values(state.matches).length;
   const seasonStatBestByPlayer = useMemo(() => {
     const keys: SeasonStatKey[] = ["appearances", "training", "goals", "assists"];
     const winners: Record<string, Set<SeasonStatKey>> = {};
@@ -611,7 +634,7 @@ export default function CoachingTool() {
                 <div className="stats-table-wrap"><StatsTable rows={statsRows} totalMatches={totalMatches} /></div>
                 <aside className="match-editor">
                   <label>Spiel auswählen<select value={selectedEvent?.id ?? ""} onChange={(event) => setSelectedEvent(upcoming.find((item) => item.id === event.target.value) ?? null)}><option value="">Bitte wählen</option>{upcoming.filter((item) => item.type === "game" || item.type === "tournament").map((item) => <option key={item.id} value={item.id}>{formatDate(item.start, false)} · {item.title}</option>)}</select></label>
-                  {selectedEvent && <MatchEditor key={selectedEvent.id} event={selectedEvent} profiles={profiles} data={state.matches[selectedEvent.id] ?? { result: "", entries: {} }} onResult={(result) => updateMatch(selectedEvent.id, { result })} onEntry={(id, patch) => updateMatchEntry(selectedEvent.id, id, patch)} />}
+                  {selectedEvent && <MatchEditor key={selectedEvent.id} event={selectedEvent} data={state.matches[selectedEvent.id] ?? { result: "", entries: {} }} onResult={(result) => updateMatch(selectedEvent.id, { result })} />}
                 </aside>
               </div>
             </section>
@@ -858,8 +881,8 @@ function MatchdayPanel({ event, events, lineup, profiles, data, onChooseEvent, o
   return <><div className="matchday-heading"><div><p className="section-index">LIVE-ERFASSUNG</p><h1>Spieltag.</h1><p>{event ? `${event.title} · ${formatDate(event.start, false)}` : "Spiel auswählen und die Aufstellung laden."}</p></div><div className="matchday-heading-actions"><label>Spiel<select value={event?.id ?? ""} onChange={(change) => { const next = events.find((item) => item.id === change.target.value); if (next) onChooseEvent(next); }}><option value="">Spiel wählen</option>{events.map((item) => <option key={item.id} value={item.id}>{formatDate(item.start, false)} · {item.title}</option>)}</select></label><button type="button" className="matchday-focus-button" onClick={() => setFocusMode((active) => !active)}>{focusMode ? "Fokus schließen" : "Fokusmodus"}</button></div></div>{!event ? <div className="matchday-empty"><strong>Kein Spiel ausgewählt.</strong><p>Über Kalender oder Auswahl oben den Spieltag öffnen.</p></div> : !players.length ? <div className="matchday-empty"><strong>Aufstellung noch nicht vorhanden.</strong><p>Bitte zuerst den Kader für dieses Spiel in der Aufstellung festlegen.</p></div> : <div className="matchday-layout"><section className="matchday-capture"><div className={`matchday-step ${step}`}><p className="section-index">{step === "start" ? "TORE UND ASSISTS EINGEBEN" : step === "scorer" ? "TOR ERFASSEN" : "ASSIST ERFASSEN"}</p><h2>{step === "start" ? "Tor erfassen" : step === "scorer" ? "Torschütze wählen" : "Assist wählen"}</h2>{step === "start" ? <button className="matchday-start" type="button" onClick={() => setStep("scorer")}>TOR ERFASSEN</button> : <><div className="matchday-player-grid">{players.filter((item) => step !== "assist" || item.player.id !== scorerId).map((item) => <button className="matchday-player-button" type="button" disabled={saving} key={item.player.id} onClick={() => step === "scorer" ? chooseScorer(item.player.id) : completeGoal(item.player.id)}><Image src={`/api/player-image?name=${encodeURIComponent(item.player.firstName)}&v=20260723`} alt="" width={96} height={96} unoptimized /><span>{item.player.firstName}</span><small>{item.position}</small></button>)}</div>{step === "assist" && <div className="matchday-actions"><button className="matchday-no-assist" type="button" disabled={saving} onClick={() => completeGoal(null)}>OHNE ASSIST</button><button className="text-button" type="button" disabled={saving} onClick={() => { setScorerId(null); setStep("scorer"); }}>Zurück</button></div>}</>}</div></section><aside className="matchday-history"><p className="section-index">ERFASSTE TORE</p><h2>{goalEvents.length}</h2>{goalEvents.length ? <div>{goalEvents.map((goal) => <article key={goal.id}><p><strong>{nameFor(goal.scorerId)}</strong><span>{goal.assistId ? `Assist: ${nameFor(goal.assistId)}` : "ohne Assist"}</span></p><button type="button" disabled={saving} onClick={() => undo(goal)}>Rückgängig</button></article>)}</div> : <p>Noch kein Tor erfasst.</p>}</aside></div>}</>;
 }
 
-function MatchEditor({ event, profiles, data, onResult, onEntry }: { event: CalendarEvent; profiles: Profile[]; data: MatchData; onResult: (value: string) => void; onEntry: (id: string, patch: Partial<MatchEntry>) => void }) {
-  return <div className="match-panel"><p className="section-index">SPIELSTATISTIK</p><h2>{event.title}</h2><label>Ergebnis<input defaultValue={data.result} onBlur={(e) => onResult(e.target.value.trim().slice(0, 20))} placeholder="z. B. 3:1" /></label><div className="match-player-list">{profiles.map((player) => { const entry = data.entries[player.id] ?? { appearance: false, goals: 0, assists: 0 }; return <div key={player.id}><label className="appearance"><input type="checkbox" checked={entry.appearance} onChange={(e) => onEntry(player.id, { appearance: e.target.checked })} /><span>{player.firstName}</span></label><label>Tore<input type="number" min="0" max="30" defaultValue={entry.goals} onBlur={(e) => onEntry(player.id, { goals: Math.min(30, Math.max(0, Number(e.target.value) || 0)) })} /></label><label>Assists<input type="number" min="0" max="30" defaultValue={entry.assists} onBlur={(e) => onEntry(player.id, { assists: Math.min(30, Math.max(0, Number(e.target.value) || 0)) })} /></label></div>; })}</div></div>;
+function MatchEditor({ event, data, onResult }: { event: CalendarEvent; data: MatchData; onResult: (value: string) => void }) {
+  return <div className="match-panel"><p className="section-index">SPIELSTATISTIK</p><h2>{event.title}</h2><label>Ergebnis<input defaultValue={data.result} onBlur={(e) => onResult(e.target.value.trim().slice(0, 20))} placeholder="z. B. 3:1" /></label><p className="match-statistic-note"><strong>Einsätze</strong> werden automatisch aus der gespeicherten Aufstellung übernommen. <strong>Tore und Assists</strong> werden im Bereich Spieltag erfasst.</p></div>;
 }
 
 function ProfileDialog({ profile, onClose, onSubmit }: { profile: Profile; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
