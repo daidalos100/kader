@@ -145,6 +145,9 @@ function validOperation(value: unknown): value is Operation {
     const diagnostic = value.value;
     if (diagnostic.deleted === true) return diagnostic.id.length >= 8 && diagnostic.id.length <= 80;
     if (typeof diagnostic.date !== "string") return false;
+    if (isRecord(diagnostic.metrics)) {
+      return ["sprint10", "sprint20", "agility", "dribbling", "shuttleRun", "jump"].every((field) => field in diagnostic.metrics!);
+    }
     return ["sprint5", "sprint10", "sprint20", "agility", "endurance", "jump"].every((field) => {
       const item = diagnostic[field];
       return item === null || (typeof item === "number" && Number.isFinite(item) && item >= 0 && item <= 10_000);
