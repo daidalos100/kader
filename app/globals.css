@@ -408,6 +408,9 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .event-card > button:hover { color: var(--red); }
 .calendar-layout { display: grid; grid-template-columns: minmax(320px, .72fr) minmax(560px, 1.28fr); gap: 18px; align-items: start; }
 .calendar-list { display: grid; gap: 10px; max-height: calc(100dvh - 240px); overflow-y: auto; padding-right: 5px; }
+.calendar-list-heading { margin-top: 4px; padding: 8px 0 3px; color: #c8c9cc; font-size: .65rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+.calendar-list-heading.past { margin-top: 18px; border-top: 1px solid rgba(244,243,239,.16); color: #8d8f95; }
+.calendar-empty { margin: 0; padding: 16px; border: 1px solid rgba(244,243,239,.12); color: #8f9197; font-size: .8rem; }
 .calendar-list .event-card { min-height: 190px; }
 .event-detail { position: sticky; top: 110px; min-height: 500px; max-height: calc(100dvh - 132px); overflow-y: auto; padding: clamp(24px, 3vw, 42px); border: 1px solid rgba(244,243,239,.16); background: #101115; }
 .event-detail > h2, .detail-head h2 { margin: 10px 0; font-size: clamp(2rem, 4vw, 3.6rem); line-height: .95; text-transform: uppercase; letter-spacing: -.04em; }
@@ -416,6 +419,13 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .empty-detail span { color: var(--red); font-size: 2rem; }
 .empty-detail p { max-width: 330px; line-height: 1.5; }
 .detail-head { display: flex; align-items: start; justify-content: space-between; gap: 18px; padding-bottom: 20px; }
+.detail-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.calendar-event-dialog { width: min(680px, calc(100vw - 28px)); }
+.calendar-event-dialog form { display: grid; gap: 12px; }
+.calendar-event-dialog label { display: grid; gap: 7px; color: #a3a5aa; font-size: .64rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.calendar-event-dialog input, .calendar-event-dialog select, .calendar-event-dialog textarea { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid rgba(244,243,239,.22); background: #101115; color: var(--white); font: inherit; }
+.calendar-event-dialog textarea { min-height: 100px; resize: vertical; }
+.calendar-edit-note { margin: -4px 0 8px; color: #9b9da2; font-size: .75rem; line-height: 1.45; }
 .attendance-list { display: grid; gap: 7px; }
 .attendance-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 62px; padding: 9px 10px; border: 1px solid rgba(244,243,239,.12); background: #16171b; }
 .attendance-row > div:first-child { display: flex; align-items: center; gap: 10px; min-width: 125px; }
