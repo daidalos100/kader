@@ -712,3 +712,9 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
   .tactics-workspace.presenting .tactics-scenarios { margin-inline: -8px; padding-inline: 8px; }
   .tactics-workspace.presenting .tactics-pitch { height: calc(100dvh - 120px); min-height: 720px; }
 }
+
+.static-card .fc-metrics { flex: 0 0 auto; width: 100%; }
+.static-card .fc-metrics > .season-metric { display: grid; grid-template-rows: minmax(34px, auto) auto; align-content: center; min-height: 88px; padding: 13px 14px; }
+.static-card .season-metric-value { grid-template-columns: auto minmax(0, 1fr); min-width: 0; }
+.static-card .season-metric-value strong { min-width: 0; overflow: hidden; font-size: clamp(1.35rem, 2.2vw, 1.75rem); text-overflow: ellipsis; white-space: nowrap; }
+.static-card .fc-metrics > .season-metric > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
