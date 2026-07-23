@@ -36,13 +36,13 @@ export async function GET(request: Request) {
 
   let response = await fetch(
     `${url}/storage/v1/object/player-images/${encodeURIComponent(slug)}.webp`,
-    { headers: storageHeaders(key), cache: "force-cache" },
+    { headers: storageHeaders(key), cache: "no-store" },
   );
 
   if (!response.ok && slug !== "default" && (response.status === 400 || response.status === 404)) {
     response = await fetch(
       `${url}/storage/v1/object/player-images/default.webp`,
-      { headers: storageHeaders(key), cache: "force-cache" },
+      { headers: storageHeaders(key), cache: "no-store" },
     );
   }
   if (!response.ok) return new Response(null, { status: 502 });
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
   return new Response(response.body, {
     headers: {
       "content-type": "image/webp",
-      "cache-control": "private, max-age=86400, stale-while-revalidate=604800",
+      "cache-control": "private, no-store",
       ...(response.headers.get("etag") ? { etag: response.headers.get("etag")! } : {}),
       "x-content-type-options": "nosniff",
     },
