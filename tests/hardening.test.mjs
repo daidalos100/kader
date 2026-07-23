@@ -109,6 +109,7 @@ test("diagnostic cards support imported metrics without embedding player data", 
     assert.ok(component.includes(marker), `missing ${marker}`);
   }
   assert.ok(!component.includes("excel-u13-2026-"), "private player measurements must not be embedded in source code");
+  assert.ok(component.includes("visibleDiagnostics"));
   assert.ok(route.includes("diagnostic.deleted !== true"));
 });
 
