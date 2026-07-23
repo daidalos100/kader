@@ -141,12 +141,15 @@ function validOperation(value: unknown): value is Operation {
       typeof value.value.personality === "string" && value.value.personality.length <= 500;
   }
   if (value.scope === "diagnostic") {
-    if (!isRecord(value.value) || typeof value.value.id !== "string") return false;
-    const diagnostic = value.value;
-    if (diagnostic.deleted === true) return diagnostic.id.length >= 8 && diagnostic.id.length <= 80;
+    if (!isRecord(value.value)) return false;
+    const diagnostic = value.value as Record<string, unknown>;
+    const diagnosticId = diagnostic.id;
+    if (typeof diagnosticId !== "string") return false;
+    if (diagnostic.deleted === true) return diagnosticId.length >= 8 && diagnosticId.length <= 80;
     if (typeof diagnostic.date !== "string") return false;
-    if (isRecord(diagnostic.metrics)) {
-      return ["sprint10", "sprint20", "agility", "dribbling", "shuttleRun", "jump"].every((field) => field in diagnostic.metrics!);
+    const metricsValue: unknown = diagnostic.metrics;
+    if (isRecord(metricsValue)) {
+      return ["sprint10", "sprint20", "agility", "dribbling", "shuttleRun", "jump"].every((field) => Object.hasOwn(metricsValue, field));
     }
     return ["sprint5", "sprint10", "sprint20", "agility", "endurance", "jump"].every((field) => {
       const item = diagnostic[field];
