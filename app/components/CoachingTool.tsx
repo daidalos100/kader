@@ -81,10 +81,14 @@ function profileFor(name: string, stored?: Partial<Profile>): Profile {
 function normalizeState(value: unknown, fallbackRoster: string[] = []): CoachingState {
   if (!value || typeof value !== "object") return { ...emptyState, roster: fallbackRoster };
   const state = value as Partial<CoachingState>;
+  const visibleDiagnostics = Object.fromEntries(Object.entries(state.diagnostics ?? {}).map(([playerId, history]) => [
+    playerId,
+    Array.isArray(history) ? history.filter((diagnostic) => diagnostic && typeof diagnostic === "object" && (diagnostic as Diagnostic).deleted !== true) : [],
+  ])) as Record<string, Diagnostic[]>;
   return {
     roster: Array.isArray(state.roster) && state.roster.length ? state.roster : fallbackRoster,
     profiles: state.profiles ?? {}, attendance: state.attendance ?? {}, attendanceReasons: state.attendanceReasons ?? {}, matches: state.matches ?? {},
-    diagnostics: state.diagnostics ?? {}, tactics: normalizeTactics(state.tactics), calendarOverrides: state.calendarOverrides ?? {},
+    diagnostics: visibleDiagnostics, tactics: normalizeTactics(state.tactics), calendarOverrides: state.calendarOverrides ?? {},
   };
 }
 
