@@ -60,7 +60,7 @@ test("tactics stay draggable, tied to lineups and support custom scenarios", asy
   ]);
   for (const marker of [
     'attack: "Angriff"', 'defense: "Verteidigung"', 'corner: "Ecke"',
-    "tactics-ball", "onPointerDown", "onKeyDown", 'fetch("/api/lineup?lineupId=default"', "+ Neue Taktik", "onCreate", "onDuplicate", "onDelete",
+    "tactics-ball", "onPointerDown", "onPointerCancel={cancelDraw}", "setPointerCapture(event.pointerId)", "onKeyDown", 'fetch("/api/lineup?lineupId=default"', "+ Neue Taktik", "onCreate", "onDuplicate", "onDelete",
   ]) assert.ok(board.includes(marker), `missing ${marker}`);
   assert.ok(board.includes("Taktik umbenennen"));
   assert.ok(component.includes('"overview", "matchday", "lineup", "tactics", "players", "stats", "calendar"'));
