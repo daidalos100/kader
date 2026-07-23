@@ -608,16 +608,21 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .tactics-drawing-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .tactics-drawing-toolbar > span { margin-right: 4px; color: #85878d; font-size: .62rem; font-weight: 900; letter-spacing: .07em; text-transform: uppercase; }
 .tactics-drawing-toolbar button { min-height: 36px; padding: 0 11px; border: 1px solid rgba(244,243,239,.18); background: #101115; color: #aeb0b6; font-size: .58rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
-.tactics-drawing-toolbar button:hover, .tactics-drawing-toolbar button.active { border-color: var(--red); background: rgba(239,22,28,.15); color: var(--white); }
+.tactics-drawing-toolbar .drawing-tool { --tool-color: #aeb0b6; border-color: color-mix(in srgb, var(--tool-color) 62%, #101115); }
+.tactics-drawing-toolbar .drawing-tool-pass { --tool-color: #62d7ef; border-style: solid; }
+.tactics-drawing-toolbar .drawing-tool-run { --tool-color: #8caeff; border-style: dashed; }
+.tactics-drawing-toolbar .drawing-tool-dribble { --tool-color: #ffeb67; border-style: dotted; }
+.tactics-drawing-toolbar .drawing-tool-shot { --tool-color: var(--red); border-width: 2px; border-style: double; }
+.tactics-drawing-toolbar .drawing-tool:hover, .tactics-drawing-toolbar .drawing-tool.active { border-color: var(--tool-color); background: color-mix(in srgb, var(--tool-color) 14%, #101115); color: var(--white); box-shadow: 0 0 0 1px color-mix(in srgb, var(--tool-color) 20%, transparent); }
 .tactics-drawing-toolbar .clear-drawing { margin-left: auto; color: #ff8c8c; }
 .tactics-drawing-toolbar button:disabled { opacity: .4; cursor: default; }
 .tactics-drawing-layer { position: absolute; z-index: 6; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
 .tactics-drawing-layer.drawing-active { pointer-events: auto; cursor: crosshair; }
-.tactic-line { fill: none; stroke: #f4f3ef; stroke-width: 1.1; vector-effect: non-scaling-stroke; marker-end: url(#tactic-arrow); }
-.tactic-line.pass { stroke: #f4f3ef; }
-.tactic-line.run { stroke: #f4f3ef; stroke-dasharray: 6 5; }
-.tactic-line.dribble { stroke: #ffeb67; stroke-width: 1.4; }
-.tactic-line.shot { stroke: var(--red); stroke-width: 2; }
+.tactic-line { fill: none; stroke: #f4f3ef; stroke-width: 1.8; vector-effect: non-scaling-stroke; filter: drop-shadow(0 1px 2px rgba(0,0,0,.72)); }
+.tactic-line.pass { stroke: #62d7ef; }
+.tactic-line.run { stroke: #8caeff; stroke-dasharray: 6 5; }
+.tactic-line.dribble { stroke: #ffeb67; stroke-width: 2.4; }
+.tactic-line.shot { stroke: var(--red); stroke-width: 3.4; }
 .tactic-line.preview { opacity: .6; }
 .tactic-position { touch-action: none; cursor: grab; user-select: none; }
 .tactic-position.dragging { z-index: 9; cursor: grabbing; }
