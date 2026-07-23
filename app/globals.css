@@ -574,6 +574,10 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
 .stats-table th { padding: 15px; color: #777980; font-size: .61rem; letter-spacing: .08em; text-align: left; text-transform: uppercase; }
 .stats-table td { padding: 13px 15px; border-top: 1px solid rgba(244,243,239,.09); color: #c7c7c8; }
 .stats-table td:first-child { display: flex; align-items: center; gap: 10px; color: var(--white); }
+.stats-sort-button { display: inline-flex; align-items: center; gap: 6px; padding: 4px 0; border: 0; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
+.stats-sort-button span { color: #676971; font-size: .8rem; line-height: 1; }
+.stats-sort-button:hover, .stats-sort-button:focus-visible, .stats-sort-button.active { color: var(--white); outline: none; }
+.stats-sort-button.active span { color: var(--red); }
 .stat-value { display: inline-flex; align-items: center; gap: 7px; color: var(--white); font-weight: 800; font-variant-numeric: tabular-nums; }
 .stat-value i { width: 8px; height: 8px; border-radius: 50%; background: #62646b; box-shadow: 0 0 0 5px rgba(98,100,107,.14); }
 .stat-value.stat-good { color: #7edb86; }
