@@ -607,7 +607,7 @@ export default function CoachingTool() {
             <section className="coach-view">
               <div className="view-heading compact"><div><p className="section-index">SPIELE &amp; ENTWICKLUNG</p><h1>Statistik.</h1><p>Spielwerte werden pro Kalendertermin erfasst und automatisch summiert.</p></div></div>
               <div className="stats-layout">
-                <div className="stats-table-wrap"><StatsTable rows={statsRows} /></div>
+                <div className="stats-table-wrap"><StatsTable rows={statsRows} totalMatches={totalMatches} /></div>
                 <aside className="match-editor">
                   <label>Spiel auswählen<select value={selectedEvent?.id ?? ""} onChange={(event) => setSelectedEvent(upcoming.find((item) => item.id === event.target.value) ?? null)}><option value="">Bitte wählen</option>{upcoming.filter((item) => item.type === "game" || item.type === "tournament").map((item) => <option key={item.id} value={item.id}>{formatDate(item.start, false)} · {item.title}</option>)}</select></label>
                   {selectedEvent && <MatchEditor key={selectedEvent.id} event={selectedEvent} profiles={profiles} data={state.matches[selectedEvent.id] ?? { result: "", entries: {} }} onResult={(result) => updateMatch(selectedEvent.id, { result })} onEntry={(id, patch) => updateMatchEntry(selectedEvent.id, id, patch)} />}
@@ -801,8 +801,16 @@ function Delta({ current, previous, lowerIsBetter }: { current: number | null; p
   return <em className={positive ? "delta-positive" : "delta-negative"}>({delta > 0 ? "+" : ""}{delta.toFixed(2)})</em>;
 }
 
-function StatsTable({ rows }: { rows: Array<{ player: Profile; appearances: number; goals: number; assists: number; participation: number | null }> }) {
-  return <table className="stats-table"><thead><tr><th>Spieler:in</th><th>Einsätze</th><th>Tore</th><th>Assists</th><th>Training</th></tr></thead><tbody>{rows.map((row) => <tr key={row.player.id}><td><Image src={`/api/player-image?name=${encodeURIComponent(row.player.firstName)}`} alt="" width={36} height={36} unoptimized /><strong>{row.player.firstName}</strong></td><td>{row.appearances}</td><td>{row.goals}</td><td>{row.assists}</td><td>{row.participation === null ? "—" : `${row.participation}%`}</td></tr>)}</tbody></table>;
+function StatsTable({ rows, totalMatches }: { rows: Array<{ player: Profile; appearances: number; goals: number; assists: number; participation: number | null }>; totalMatches: number }) {
+  const bestGoals = Math.max(0, ...rows.map((row) => row.goals));
+  const bestAssists = Math.max(0, ...rows.map((row) => row.assists));
+  const rateStatus = (value: number | null) => value === null ? "neutral" : value >= 80 ? "good" : value >= 60 ? "average" : "critical";
+  return <table className="stats-table"><thead><tr><th>Spieler:in</th><th>Einsätze</th><th>Tore</th><th>Assists</th><th>Training</th></tr></thead><tbody>{rows.map((row) => {
+    const appearanceRate = totalMatches ? Math.round((row.appearances / totalMatches) * 100) : null;
+    const trainingStatus = rateStatus(row.participation);
+    const appearanceStatus = rateStatus(appearanceRate);
+    return <tr key={row.player.id}><td><Image src={`/api/player-image?name=${encodeURIComponent(row.player.firstName)}`} alt="" width={36} height={36} unoptimized /><strong>{row.player.firstName}</strong></td><td><span className={`stat-value stat-${appearanceStatus}`} title={appearanceRate === null ? "Noch keine Spieltage erfasst" : `${appearanceRate}% Einsatzquote`}><i aria-hidden="true" />{row.appearances}</span></td><td><span className="stat-value">{row.goals}{bestGoals > 0 && row.goals === bestGoals && <span className="stat-crown" title="Beste Torschützin / bester Torschütze" aria-label="Beste Torschützin / bester Torschütze">👑</span>}</span></td><td><span className="stat-value">{row.assists}{bestAssists > 0 && row.assists === bestAssists && <span className="stat-crown" title="Beste Assistgeberin / bester Assistgeber" aria-label="Beste Assistgeberin / bester Assistgeber">👑</span>}</span></td><td><span className={`stat-value stat-${trainingStatus}`} title={row.participation === null ? "Noch keine Trainings erfasst" : `${row.participation}% Trainingsteilnahme`}><i aria-hidden="true" />{row.participation === null ? "—" : `${row.participation}%`}</span></td></tr>;
+  })}</tbody></table>;
 }
 
 function MatchdayPanel({ event, events, lineup, profiles, data, onChooseEvent, onGoal, onUndo }: { event: CalendarEvent | null; events: CalendarEvent[]; lineup: MatchdayLineupPlayer[]; profiles: Profile[]; data: MatchData | null; onChooseEvent: (event: CalendarEvent) => void; onGoal: (eventId: string, scorerId: string, assistId: string | null) => Promise<boolean>; onUndo: (eventId: string, goal: GoalEvent) => Promise<boolean> }) {
