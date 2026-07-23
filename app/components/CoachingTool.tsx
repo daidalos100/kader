@@ -58,6 +58,7 @@ type SaveOperation = { scope: string; key: string; value: unknown; expectedRevis
 type HistoryEntry = { id: number; scope: string; record_key: string; revision: number; changed_at: string; changed_by: string };
 
 const positionOptions = ["TW", "IV", "LV", "RV", "ZDM", "ZM", "LF", "RF", "ST"];
+const seasonStart = new Date("2026-07-25T00:00:00+02:00").getTime();
 const emptyState: CoachingState = { roster: [], profiles: {}, attendance: {}, attendanceReasons: {}, matches: {}, diagnostics: {}, tactics: {} };
 function playerId(name: string) {
   return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "-");
@@ -140,7 +141,7 @@ export default function CoachingTool() {
     () => state.roster.map((name) => profileFor(name, state.profiles[playerId(name)])),
     [state.profiles, state.roster],
   );
-  const upcoming = useMemo(() => events.filter((event) => new Date(event.end).getTime() >= referenceTime).slice(0, 40), [events, referenceTime]);
+  const upcoming = useMemo(() => events.filter((event) => new Date(event.start).getTime() >= Math.max(referenceTime, seasonStart)).slice(0, 40), [events, referenceTime]);
   const nextEvents = upcoming.slice(0, 4);
   const nextGame = upcoming.find((event) => event.type === "game" || event.type === "tournament");
   const matchdayEvent = selectedEvent && (selectedEvent.type === "game" || selectedEvent.type === "tournament") ? selectedEvent : nextGame;
@@ -554,7 +555,7 @@ export default function CoachingTool() {
                 profiles={profiles}
                 data={matchdayEvent ? state.matches[matchdayEvent.id] ?? { result: "", entries: {}, goalEvents: [] } : null}
                 onChooseEvent={(event) => setSelectedEvent(event)}
-                events={events.filter((event) => event.type === "game" || event.type === "tournament")}
+                events={upcoming.filter((event) => event.type === "game" || event.type === "tournament")}
                 onGoal={recordGoal}
                 onUndo={undoGoal}
               />
@@ -608,7 +609,7 @@ export default function CoachingTool() {
               <div className="stats-layout">
                 <div className="stats-table-wrap"><StatsTable rows={statsRows} /></div>
                 <aside className="match-editor">
-                  <label>Spiel auswählen<select value={selectedEvent?.id ?? ""} onChange={(event) => setSelectedEvent(events.find((item) => item.id === event.target.value) ?? null)}><option value="">Bitte wählen</option>{events.filter((item) => item.type === "game" || item.type === "tournament").map((item) => <option key={item.id} value={item.id}>{formatDate(item.start, false)} · {item.title}</option>)}</select></label>
+                  <label>Spiel auswählen<select value={selectedEvent?.id ?? ""} onChange={(event) => setSelectedEvent(upcoming.find((item) => item.id === event.target.value) ?? null)}><option value="">Bitte wählen</option>{upcoming.filter((item) => item.type === "game" || item.type === "tournament").map((item) => <option key={item.id} value={item.id}>{formatDate(item.start, false)} · {item.title}</option>)}</select></label>
                   {selectedEvent && <MatchEditor key={selectedEvent.id} event={selectedEvent} profiles={profiles} data={state.matches[selectedEvent.id] ?? { result: "", entries: {} }} onResult={(result) => updateMatch(selectedEvent.id, { result })} onEntry={(id, patch) => updateMatchEntry(selectedEvent.id, id, patch)} />}
                 </aside>
               </div>
