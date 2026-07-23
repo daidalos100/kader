@@ -34,6 +34,7 @@ type Diagnostic = {
   jump: number | null;
   source?: string;
   ageGroup?: string;
+  deleted?: boolean;
   metrics?: {
     sprint10: DiagnosticMetric;
     sprint20: DiagnosticMetric;
@@ -47,6 +48,7 @@ type DiagnosticMetric = { attempts: Array<number | string | null>; best: number 
 type DiagnosticDisciplineKey = "sprint10" | "sprint20" | "agility" | "dribbling" | "shuttleRun" | "jump";
 type SeasonStatKey = "appearances" | "training" | "goals" | "assists";
 type StatSortKey = "player" | "appearances" | "goals" | "assists" | "training";
+type StatEventDetail = { eventId: string; title: string; date: string; detail: string };
 type CalendarEventOverride = Pick<CalendarEvent, "id" | "uid" | "title" | "start" | "end" | "allDay" | "location" | "description" | "type">;
 type CoachingState = {
   roster: string[];
@@ -461,34 +463,50 @@ export default function CoachingTool() {
   const eligibleEventLineupIds = useMemo(() => calendarEvents
     .filter((event) => (event.type === "game" || event.type === "tournament") && new Date(event.start).getTime() >= seasonStart)
     .map(eventLineupId), [calendarEvents]);
-  const appearanceCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    eligibleEventLineupIds.forEach((lineupId) => {
+  const calendarEventById = useMemo(() => new Map(calendarEvents.map((event) => [event.id, event])), [calendarEvents]);
+  const appearanceEventsByPlayer = useMemo(() => {
+    const appearances: Record<string, StatEventDetail[]> = {};
+    calendarEvents
+      .filter((event) => (event.type === "game" || event.type === "tournament") && new Date(event.start).getTime() >= seasonStart)
+      .forEach((event) => {
+      const lineupId = eventLineupId(event);
       const used = new Set<string>();
       Object.values(eventLineups[lineupId] ?? {}).flat().forEach((entry) => {
         const player = profiles.find((item) => item.id === entry.id)
           ?? profiles.find((item) => item.firstName.localeCompare(entry.firstName?.trim() ?? "", "de", { sensitivity: "base" }) === 0);
         if (player) used.add(player.id);
       });
-      used.forEach((id) => { counts[id] = (counts[id] ?? 0) + 1; });
+      used.forEach((id) => { (appearances[id] ??= []).push({ eventId: event.id, title: event.title, date: formatDate(event.start, false), detail: "Im Kader" }); });
     });
-    return counts;
-  }, [eligibleEventLineupIds, eventLineups, profiles]);
+    return appearances;
+  }, [calendarEvents, eventLineups, profiles]);
+  const appearanceCounts = useMemo(() => Object.fromEntries(Object.entries(appearanceEventsByPlayer).map(([id, events]) => [id, events.length])), [appearanceEventsByPlayer]);
   const totalMatches = eligibleEventLineupIds.filter((lineupId) => Object.values(eventLineups[lineupId] ?? {}).some((players) => players.length > 0)).length;
   const trainingEventIds = useMemo(() => new Set(calendarEvents.filter((event) => event.type === "training").map((event) => event.id)), [calendarEvents]);
   const statsRows = profiles.map((player) => {
     let appearances = 0; let goals = 0; let assists = 0; let present = 0; let recorded = 0;
-    Object.values(state.matches).forEach((match) => {
+    const goalEvents: StatEventDetail[] = [];
+    const assistEvents: StatEventDetail[] = [];
+    const trainingEvents: StatEventDetail[] = [];
+    Object.entries(state.matches).forEach(([eventId, match]) => {
       const entry = match.entries[player.id];
       goals += entry?.goals ?? 0; assists += entry?.assists ?? 0;
+      const event = calendarEventById.get(eventId);
+      if (entry?.goals) goalEvents.push({ eventId, title: event?.title ?? "Spiel", date: event ? formatDate(event.start, false) : "Spieltag", detail: `${entry.goals} ${entry.goals === 1 ? "Tor" : "Tore"}` });
+      if (entry?.assists) assistEvents.push({ eventId, title: event?.title ?? "Spiel", date: event ? formatDate(event.start, false) : "Spieltag", detail: `${entry.assists} ${entry.assists === 1 ? "Assist" : "Assists"}` });
     });
     Object.entries(state.attendance).forEach(([eventId, attendance]) => {
       if (!trainingEventIds.has(eventId)) return;
-      if (attendance[player.id]) recorded += 1;
-      if (attendance[player.id] === "present") present += 1;
+      const status = attendance[player.id];
+      if (!status) return;
+      recorded += 1;
+      if (status === "present") present += 1;
+      const event = calendarEventById.get(eventId);
+      const reason = status === "excused" ? state.attendanceReasons[eventId]?.[player.id] : undefined;
+      trainingEvents.push({ eventId, title: event?.title ?? "Training", date: event ? formatDate(event.start, false) : "Trainingstermin", detail: status === "present" ? "Anwesend" : status === "excused" ? `Entschuldigt${reason ? ` · ${reason}` : ""}` : "Abwesend" });
     });
     appearances = appearanceCounts[player.id] ?? 0;
-    return { player, appearances, goals, assists, participation: recorded ? Math.round((present / recorded) * 100) : null };
+    return { player, appearances, goals, assists, participation: recorded ? Math.round((present / recorded) * 100) : null, appearanceEvents: appearanceEventsByPlayer[player.id] ?? [], goalEvents, assistEvents, trainingEvents };
   });
   const seasonStatBestByPlayer = useMemo(() => {
     const keys: SeasonStatKey[] = ["appearances", "training", "goals", "assists"];
@@ -869,9 +887,10 @@ function Delta({ current, previous, lowerIsBetter }: { current: number | null; p
   return <em className={positive ? "delta-positive" : "delta-negative"}>({delta > 0 ? "+" : ""}{delta.toFixed(2)})</em>;
 }
 
-function StatsTable({ rows, totalMatches }: { rows: Array<{ player: Profile; appearances: number; goals: number; assists: number; participation: number | null }>; totalMatches: number }) {
+function StatsTable({ rows, totalMatches }: { rows: Array<{ player: Profile; appearances: number; goals: number; assists: number; participation: number | null; appearanceEvents: StatEventDetail[]; goalEvents: StatEventDetail[]; assistEvents: StatEventDetail[]; trainingEvents: StatEventDetail[] }>; totalMatches: number }) {
   const [sortKey, setSortKey] = useState<StatSortKey>("player");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [detail, setDetail] = useState<{ player: Profile; label: string; value: string; events: StatEventDetail[] } | null>(null);
   const bestGoals = Math.max(0, ...rows.map((row) => row.goals));
   const bestAssists = Math.max(0, ...rows.map((row) => row.assists));
   const rateStatus = (value: number | null) => value === null ? "neutral" : value >= 80 ? "good" : value >= 60 ? "average" : "critical";
@@ -886,12 +905,16 @@ function StatsTable({ rows, totalMatches }: { rows: Array<{ player: Profile; app
     return result === 0 ? left.player.firstName.localeCompare(right.player.firstName, "de") : sortDirection === "asc" ? result : -result;
   });
   const header = (key: StatSortKey, label: string) => <th aria-sort={sortKey === key ? sortDirection === "asc" ? "ascending" : "descending" : "none"}><button type="button" className={`stats-sort-button${sortKey === key ? " active" : ""}`} onClick={() => changeSort(key)}>{label}<span aria-hidden="true">{sortKey === key ? sortDirection === "asc" ? "↑" : "↓" : "↕"}</span></button></th>;
-  return <table className="stats-table"><thead><tr>{header("player", "Spieler:in")}{header("appearances", "Einsätze")}{header("goals", "Tore")}{header("assists", "Assists")}{header("training", "Training")}</tr></thead><tbody>{sortedRows.map((row) => {
+  return <><table className="stats-table"><thead><tr>{header("player", "Spieler:in")}{header("appearances", "Einsätze")}{header("goals", "Tore")}{header("assists", "Assists")}{header("training", "Training")}</tr></thead><tbody>{sortedRows.map((row) => {
     const appearanceRate = totalMatches ? Math.round((row.appearances / totalMatches) * 100) : null;
     const trainingStatus = rateStatus(row.participation);
     const appearanceStatus = rateStatus(appearanceRate);
-    return <tr key={row.player.id}><td><Image src={`/api/player-image?name=${encodeURIComponent(row.player.firstName)}`} alt="" width={36} height={36} unoptimized /><strong>{row.player.firstName}</strong></td><td><span className={`stat-value stat-${appearanceStatus}`} title={appearanceRate === null ? "Noch keine Spieltage erfasst" : `${appearanceRate}% Einsatzquote`}><i aria-hidden="true" />{row.appearances}</span></td><td><span className="stat-value">{row.goals}{bestGoals > 0 && row.goals === bestGoals && <span className="stat-crown" title="Beste Torschützin / bester Torschütze" aria-label="Beste Torschützin / bester Torschütze">👑</span>}</span></td><td><span className="stat-value">{row.assists}{bestAssists > 0 && row.assists === bestAssists && <span className="stat-crown" title="Beste Assistgeberin / bester Assistgeber" aria-label="Beste Assistgeberin / bester Assistgeber">👑</span>}</span></td><td><span className={`stat-value stat-${trainingStatus}`} title={row.participation === null ? "Noch keine Trainings erfasst" : `${row.participation}% Trainingsteilnahme`}><i aria-hidden="true" />{row.participation === null ? "—" : `${row.participation}%`}</span></td></tr>;
-  })}</tbody></table>;
+    return <tr key={row.player.id}><td><Image src={`/api/player-image?name=${encodeURIComponent(row.player.firstName)}`} alt="" width={36} height={36} unoptimized /><strong>{row.player.firstName}</strong></td><td><button type="button" className={`stat-value stats-value-button stat-${appearanceStatus}`} onClick={() => setDetail({ player: row.player, label: "Einsätze", value: appearanceRate === null ? "—" : `${appearanceRate}%`, events: row.appearanceEvents })} title={appearanceRate === null ? "Noch keine Spieltage erfasst" : `${appearanceRate}% Einsatzquote`}><i aria-hidden="true" />{appearanceRate === null ? "—" : `${appearanceRate}%`}</button></td><td><button type="button" className="stat-value stats-value-button" onClick={() => setDetail({ player: row.player, label: "Tore", value: String(row.goals), events: row.goalEvents })}>{row.goals}{bestGoals > 0 && row.goals === bestGoals && <span className="stat-crown" title="Beste Torschützin / bester Torschütze" aria-label="Beste Torschützin / bester Torschütze">👑</span>}</button></td><td><button type="button" className="stat-value stats-value-button" onClick={() => setDetail({ player: row.player, label: "Assists", value: String(row.assists), events: row.assistEvents })}>{row.assists}{bestAssists > 0 && row.assists === bestAssists && <span className="stat-crown" title="Beste Assistgeberin / bester Assistgeber" aria-label="Beste Assistgeberin / bester Assistgeber">👑</span>}</button></td><td><button type="button" className={`stat-value stats-value-button stat-${trainingStatus}`} onClick={() => setDetail({ player: row.player, label: "Training", value: row.participation === null ? "—" : `${row.participation}%`, events: row.trainingEvents })} title={row.participation === null ? "Noch keine Trainings erfasst" : `${row.participation}% Trainingsteilnahme`}><i aria-hidden="true" />{row.participation === null ? "—" : `${row.participation}%`}</button></td></tr>;
+  })}</tbody></table>{detail && <StatDetailsDialog {...detail} onClose={() => setDetail(null)} />}</>;
+}
+
+function StatDetailsDialog({ player, label, value, events, onClose }: { player: Profile; label: string; value: string; events: StatEventDetail[]; onClose: () => void }) {
+  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="stat-details-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="coach-modal stat-details-dialog"><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">STATISTIK · DETAILS</p><h2 id="stat-details-title">{player.firstName} · {label}</h2><strong className="stat-details-value">{value}</strong>{events.length ? <ul>{events.map((event) => <li key={`${event.eventId}-${event.detail}`}><time>{event.date}</time><div><strong>{event.title}</strong><span>{event.detail}</span></div></li>)}</ul> : <p className="history-empty">Noch keine Einträge vorhanden.</p>}<div className="modal-actions"><button className="primary-button" type="button" onClick={onClose}>Schließen</button></div></section></div>;
 }
 
 function MatchdayPanel({ event, events, lineup, profiles, data, onChooseEvent, onGoal, onUndo, onResult }: { event: CalendarEvent | null; events: CalendarEvent[]; lineup: MatchdayLineupPlayer[]; profiles: Profile[]; data: MatchData | null; onChooseEvent: (event: CalendarEvent) => void; onGoal: (eventId: string, scorerId: string, assistId: string | null) => Promise<boolean>; onUndo: (eventId: string, goal: GoalEvent) => Promise<boolean>; onResult: (result: string) => void }) {
