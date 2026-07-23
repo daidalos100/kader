@@ -63,11 +63,22 @@ test("tactics stay draggable, tied to lineups and support custom scenarios", asy
     "tactics-ball", "onPointerDown", "onKeyDown", 'fetch("/api/lineup?lineupId=default"', "+ Neue Taktik", "onCreate", "onDuplicate", "onDelete",
   ]) assert.ok(board.includes(marker), `missing ${marker}`);
   assert.ok(board.includes("Taktik umbenennen"));
-  assert.ok(component.includes('"overview", "calendar", "lineup", "tactics", "players", "stats"'));
+  assert.ok(component.includes('"overview", "calendar", "lineup", "matchday", "tactics", "players", "stats"'));
   assert.ok(component.includes('operation("tactic"'));
   assert.ok(route.includes('"tactic"'));
   assert.ok(route.includes('"attack", "defense", "corner"'));
   assert.ok(route.includes("custom-[a-z0-9-]"));
+});
+
+test("matchday capture records and reverses scorer and assist together", async () => {
+  const [component, route] = await Promise.all([
+    source("app/components/CoachingTool.tsx"), source("app/api/coaching-state/route.ts"),
+  ]);
+  for (const marker of ["MatchdayPanel", "TOR ERFASSEN", "OHNE ASSIST", "Rückgängig", 'operation("match_goal"', "recordGoal", "undoGoal"]) {
+    assert.ok(component.includes(marker), `missing ${marker}`);
+  }
+  assert.ok(route.includes('"match_goal"'));
+  assert.ok(route.includes("goalEvents"));
 });
 
 test("diagnostic cards support imported metrics without embedding player data", async () => {
@@ -86,4 +97,3 @@ test("player card back keeps details accessible on constrained screens", async (
     assert.ok(css.includes(marker) || component.includes(marker), `missing ${marker}`);
   }
 });
-
