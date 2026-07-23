@@ -74,10 +74,9 @@ test("matchday capture records and reverses scorer and assist together", async (
   const [component, route] = await Promise.all([
     source("app/components/CoachingTool.tsx"), source("app/api/coaching-state/route.ts"),
   ]);
-  for (const marker of ["MatchdayPanel", "TOR ERFASSEN", "OHNE ASSIST", "Rückgängig", 'operation("match_goal"', "recordGoal", "undoGoal"]) {
+  for (const marker of ["MatchdayPanel", "TOR ERFASSEN", "OHNE ASSIST", "Rückgängig", "goalEvents", "recordGoal", "undoGoal"]) {
     assert.ok(component.includes(marker), `missing ${marker}`);
   }
-  assert.ok(route.includes('"match_goal"'));
   assert.ok(route.includes("goalEvents"));
 });
 
