@@ -8,6 +8,7 @@ import type { CalendarEvent } from "../lib/calendar";
 
 type Tab = "overview" | "calendar" | "lineup" | "tactics" | "players" | "stats";
 type AttendanceStatus = "present" | "excused" | "absent";
+type AbsenceReason = "Krankheit" | "Verletzung" | "Privat" | "Schul-Event";
 type Profile = {
   id: string;
   firstName: string;
@@ -46,6 +47,7 @@ type CoachingState = {
   roster: string[];
   profiles: Record<string, Partial<Profile>>;
   attendance: Record<string, Record<string, AttendanceStatus>>;
+  attendanceReasons: Record<string, Record<string, AbsenceReason>>;
   matches: Record<string, MatchData>;
   diagnostics: Record<string, Diagnostic[]>;
   tactics: Record<string, TacticEntry>;
@@ -54,7 +56,7 @@ type SaveOperation = { scope: string; key: string; value: unknown; expectedRevis
 type HistoryEntry = { id: number; scope: string; record_key: string; revision: number; changed_at: string; changed_by: string };
 
 const positionOptions = ["TW", "IV", "LV", "RV", "ZDM", "ZM", "LF", "RF", "ST"];
-const emptyState: CoachingState = { roster: [], profiles: {}, attendance: {}, matches: {}, diagnostics: {}, tactics: {} };
+const emptyState: CoachingState = { roster: [], profiles: {}, attendance: {}, attendanceReasons: {}, matches: {}, diagnostics: {}, tactics: {} };
 function playerId(name: string) {
   return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "-");
 }
@@ -71,7 +73,7 @@ function normalizeState(value: unknown, fallbackRoster: string[] = []): Coaching
   const state = value as Partial<CoachingState>;
   return {
     roster: Array.isArray(state.roster) && state.roster.length ? state.roster : fallbackRoster,
-    profiles: state.profiles ?? {}, attendance: state.attendance ?? {}, matches: state.matches ?? {},
+    profiles: state.profiles ?? {}, attendance: state.attendance ?? {}, attendanceReasons: state.attendanceReasons ?? {}, matches: state.matches ?? {},
     diagnostics: state.diagnostics ?? {}, tactics: normalizeTactics(state.tactics),
   };
 }
@@ -220,11 +222,12 @@ export default function CoachingTool() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function setAttendance(eventId: string, id: string, status: AttendanceStatus) {
+  function setAttendance(eventId: string, id: string, status: AttendanceStatus, reason?: AbsenceReason) {
     void save({
       ...state,
       attendance: { ...state.attendance, [eventId]: { ...(state.attendance[eventId] ?? {}), [id]: status } },
-    }, [operation("attendance", `${eventId}:${id}`, status)]);
+      attendanceReasons: status === "excused" && reason ? { ...state.attendanceReasons, [eventId]: { ...(state.attendanceReasons[eventId] ?? {}), [id]: reason } } : state.attendanceReasons,
+    }, [operation("attendance", `${eventId}:${id}`, status), ...(status === "excused" && reason ? [operation("attendance_reason", `${eventId}:${id}`, reason)] : [])]);
   }
 
   function setAllPresent(eventId: string) {
@@ -470,7 +473,7 @@ export default function CoachingTool() {
                 </div>
                 <aside className="event-detail">
                   {selectedEvent ? selectedEvent.type === "training" ? (
-                    <AttendancePanel event={selectedEvent} profiles={profiles} attendance={state.attendance[selectedEvent.id] ?? {}} onSet={setAttendance} onAll={setAllPresent} />
+                    <AttendancePanel event={selectedEvent} profiles={profiles} attendance={state.attendance[selectedEvent.id] ?? {}} reasons={state.attendanceReasons[selectedEvent.id] ?? {}} onSet={setAttendance} onAll={setAllPresent} />
                   ) : (
                     <><p className="section-index">{eventLabel(selectedEvent.type)}</p><h2>{selectedEvent.title}</h2><p>{formatDate(selectedEvent.start)}</p><p>{selectedEvent.location}</p><div className="card-actions"><button onClick={() => openEvent(selectedEvent, "lineup")}>Kader planen</button><button className="secondary" onClick={() => openEvent(selectedEvent, "stats")}>Statistik erfassen</button></div></>
                   ) : <div className="empty-detail"><span>←</span><p>Termin auswählen, um Anwesenheit, Kader oder Statistik zu bearbeiten.</p></div>}
@@ -631,8 +634,10 @@ function EventCard({ event, active, onOpen }: { event: CalendarEvent; active?: b
   return <article className={`event-card type-${event.type}${active ? " active" : ""}`}><div className="event-card-top"><span>{eventLabel(event.type)}</span><time>{formatDate(event.start)}</time></div><h3>{event.title}</h3><p>{event.location || "Ort noch offen"}</p><button type="button" onClick={() => onOpen(event, target)}>{event.type === "training" ? "Teilnahme eintragen" : event.type === "other" ? "Termin öffnen" : "Kader planen"} →</button></article>;
 }
 
-function AttendancePanel({ event, profiles, attendance, onSet, onAll }: { event: CalendarEvent; profiles: Profile[]; attendance: Record<string, AttendanceStatus>; onSet: (eventId: string, id: string, status: AttendanceStatus) => void; onAll: (eventId: string) => void }) {
-  return <><div className="detail-head"><div><p className="section-index">TRAININGSTEILNAHME</p><h2>{event.title}</h2><p>{formatDate(event.start)}</p></div><button className="text-button" onClick={() => onAll(event.id)}>Alle anwesend</button></div><div className="attendance-list">{profiles.map((player) => <div className="attendance-row" key={player.id}><div><Image src={`/api/player-image?name=${encodeURIComponent(player.firstName)}`} alt="" width={38} height={38} unoptimized /><strong>{player.firstName}</strong></div><div className="attendance-options">{(["present", "excused", "absent"] as AttendanceStatus[]).map((status) => <button key={status} className={`${status}${attendance[player.id] === status ? " selected" : ""}`} onClick={() => onSet(event.id, player.id, status)} aria-label={`${player.firstName}: ${{ present: "anwesend", excused: "entschuldigt", absent: "abwesend" }[status]}`}><span />{{ present: "Anwesend", excused: "Entschuldigt", absent: "Abwesend" }[status]}</button>)}</div></div>)}</div></>;
+function AttendancePanel({ event, profiles, attendance, reasons, onSet, onAll }: { event: CalendarEvent; profiles: Profile[]; attendance: Record<string, AttendanceStatus>; reasons: Record<string, AbsenceReason>; onSet: (eventId: string, id: string, status: AttendanceStatus, reason?: AbsenceReason) => void; onAll: (eventId: string) => void }) {
+  const [reasonPlayer, setReasonPlayer] = useState<string | null>(null);
+  const absenceReasons: AbsenceReason[] = ["Krankheit", "Verletzung", "Privat", "Schul-Event"];
+  return <><div className="detail-head"><div><p className="section-index">TRAININGSTEILNAHME</p><h2>{event.title}</h2><p>{formatDate(event.start)}</p></div><button className="text-button" onClick={() => onAll(event.id)}>Alle anwesend</button></div><div className="attendance-list">{profiles.map((player) => <div className="attendance-row" key={player.id}><div><Image src={`/api/player-image?name=${encodeURIComponent(player.firstName)}`} alt="" width={38} height={38} unoptimized /><strong>{player.firstName}</strong>{attendance[player.id] === "excused" && reasons[player.id] && <small className="attendance-reason">{reasons[player.id]}</small>}</div><div className="attendance-options">{(["present", "excused", "absent"] as AttendanceStatus[]).map((status) => <button key={status} className={`${status}${attendance[player.id] === status ? " selected" : ""}`} onClick={() => status === "excused" ? setReasonPlayer(player.id) : onSet(event.id, player.id, status)} aria-label={`${player.firstName}: ${{ present: "anwesend", excused: "entschuldigt", absent: "abwesend" }[status]}`}><span />{{ present: "Anwesend", excused: "Entschuldigt", absent: "Abwesend" }[status]}</button>)}{reasonPlayer === player.id && <select className="attendance-reason-select" aria-label={`${player.firstName}: Grund auswählen`} value={reasons[player.id] ?? ""} onChange={(event) => { const reason = event.target.value as AbsenceReason; if (reason) { onSet(event.currentTarget.name || "", player.id, "excused", reason); setReasonPlayer(null); } }} name={event.id}><option value="">Grund wählen</option>{absenceReasons.map((reason) => <option key={reason} value={reason}>{reason}</option>)}</select>}</div></div>)}</div></>;
 }
 
 function seasonStatus(key: SeasonStatKey, value: number | null): "good" | "average" | "critical" | "neutral" {
