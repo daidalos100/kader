@@ -718,3 +718,10 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .static-card .season-metric-value { grid-template-columns: auto minmax(0, 1fr); min-width: 0; }
 .static-card .season-metric-value strong { min-width: 0; overflow: hidden; font-size: clamp(1.35rem, 2.2vw, 1.75rem); text-overflow: ellipsis; white-space: nowrap; }
 .static-card .fc-metrics > .season-metric > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.static-card .fc-metrics .season-metric-value { grid-template-columns: auto minmax(0, 1fr); min-width: 0; padding: 0; }
+.static-card .season-metric-value strong { min-width: 0; overflow: visible; font-size: clamp(1.25rem, 2.1vw, 1.7rem); letter-spacing: -.04em; white-space: nowrap; }
+@media (max-width: 560px) {
+  .static-card .fc-metrics .season-metric-value { gap: 6px; }
+  .static-card .season-metric-value strong { font-size: 1.3rem; }
+}
