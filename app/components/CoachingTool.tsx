@@ -648,7 +648,7 @@ function seasonStatus(key: SeasonStatKey, value: number | null): "good" | "avera
 
 function SeasonMetric({ label, value, keyName, best, progress }: { label: string; value: string | number; keyName: SeasonStatKey; best: boolean; progress?: number | null }) {
   const numeric = typeof value === "number" ? value : value === "—" ? null : Number.parseFloat(value);
-  return <div className="season-metric"><div className="season-metric-value"><span className={`diagnostic-dot ${seasonStatus(keyName, Number.isFinite(numeric) ? numeric : null)}`} aria-hidden="true" /><strong>{value}</strong></div>{progress !== undefined && <div className="season-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress ?? 0} aria-label={`${label}: ${progress ?? 0}%`}><span style={{ width: `${Math.max(0, Math.min(100, progress ?? 0))}%` }} /></div>}<span>{label}</span></div>;
+  return <div className="season-metric"><div className="season-metric-value"><span className={`diagnostic-dot ${seasonStatus(keyName, Number.isFinite(numeric) ? numeric : null)}`} aria-hidden="true" /><strong>{value}</strong></div><span>{label}</span></div>;
 }
 
 function PlayerCard({ profile, flipped, appearances, appearanceRate, goals, assists, participation, bestSeasonStatKeys, history, bestDisciplineKeys, onFlip, onEdit, onDetails }: { profile: Profile; flipped: boolean; appearances: number; appearanceRate: number | null; goals: number; assists: number; participation: number | null; bestSeasonStatKeys: Set<SeasonStatKey>; history: Diagnostic[]; bestDisciplineKeys: Set<DiagnosticDisciplineKey>; onFlip: () => void; onEdit: () => void; onDetails: () => void }) {
