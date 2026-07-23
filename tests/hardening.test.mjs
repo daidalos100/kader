@@ -82,7 +82,7 @@ test("player card back keeps details accessible on constrained screens", async (
   const [css, component] = await Promise.all([
     source("app/globals.css"), source("app/components/CoachingTool.tsx"),
   ]);
-  for (const marker of ["Details ansehen", "DiagnosticDetailsDialog", "diagnostic-details-dialog", "diagnostic-dot", "overflow-y: auto", ".fc-card { height: 690px"]) {
+  for (const marker of ["Details ansehen", "DiagnosticDetailsDialog", "role=\"dialog\"", "diagnostic-details-dialog", "diagnostic-dot", "diagnostic-crown", "critical", "overflow-y: auto", ".fc-card { height: 690px"]) {
     assert.ok(css.includes(marker) || component.includes(marker), `missing ${marker}`);
   }
 });
