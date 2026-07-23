@@ -47,6 +47,7 @@ type DiagnosticMetric = { attempts: Array<number | string | null>; best: number 
 type DiagnosticDisciplineKey = "sprint10" | "sprint20" | "agility" | "dribbling" | "shuttleRun" | "jump";
 type SeasonStatKey = "appearances" | "training" | "goals" | "assists";
 type StatSortKey = "player" | "appearances" | "goals" | "assists" | "training";
+type CalendarEventOverride = Pick<CalendarEvent, "id" | "uid" | "title" | "start" | "end" | "allDay" | "location" | "description" | "type">;
 type CoachingState = {
   roster: string[];
   profiles: Record<string, Partial<Profile>>;
@@ -55,13 +56,14 @@ type CoachingState = {
   matches: Record<string, MatchData>;
   diagnostics: Record<string, Diagnostic[]>;
   tactics: Record<string, TacticEntry>;
+  calendarOverrides: Record<string, CalendarEventOverride>;
 };
 type SaveOperation = { scope: string; key: string; value: unknown; expectedRevision: number };
 type HistoryEntry = { id: number; scope: string; record_key: string; revision: number; changed_at: string; changed_by: string };
 
 const positionOptions = ["TW", "IV", "LV", "RV", "ZDM", "ZM", "LF", "RF", "ST"];
 const seasonStart = new Date("2026-07-25T00:00:00+02:00").getTime();
-const emptyState: CoachingState = { roster: [], profiles: {}, attendance: {}, attendanceReasons: {}, matches: {}, diagnostics: {}, tactics: {} };
+const emptyState: CoachingState = { roster: [], profiles: {}, attendance: {}, attendanceReasons: {}, matches: {}, diagnostics: {}, tactics: {}, calendarOverrides: {} };
 function playerId(name: string) {
   return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "-");
 }
@@ -79,8 +81,14 @@ function normalizeState(value: unknown, fallbackRoster: string[] = []): Coaching
   return {
     roster: Array.isArray(state.roster) && state.roster.length ? state.roster : fallbackRoster,
     profiles: state.profiles ?? {}, attendance: state.attendance ?? {}, attendanceReasons: state.attendanceReasons ?? {}, matches: state.matches ?? {},
-    diagnostics: state.diagnostics ?? {}, tactics: normalizeTactics(state.tactics),
+    diagnostics: state.diagnostics ?? {}, tactics: normalizeTactics(state.tactics), calendarOverrides: state.calendarOverrides ?? {},
   };
+}
+
+function localDateTimeValue(value: string) {
+  const date = new Date(value);
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
 function normalizeTactics(value: unknown): Record<string, TacticEntry> {
@@ -138,13 +146,16 @@ export default function CoachingTool() {
   const [positionFilter, setPositionFilter] = useState("all");
   const [matchdayLineup, setMatchdayLineup] = useState<MatchdayLineupPlayer[]>([]);
   const [eventLineups, setEventLineups] = useState<Record<string, SavedLineup>>({});
+  const [editingCalendarEvent, setEditingCalendarEvent] = useState<CalendarEvent | null>(null);
   const [referenceTime] = useState(() => Date.now());
 
   const profiles = useMemo(
     () => state.roster.map((name) => profileFor(name, state.profiles[playerId(name)])),
     [state.profiles, state.roster],
   );
-  const upcoming = useMemo(() => events.filter((event) => new Date(event.start).getTime() >= Math.max(referenceTime, seasonStart)).slice(0, 40), [events, referenceTime]);
+  const calendarEvents = useMemo(() => events.map((event) => ({ ...event, ...(state.calendarOverrides[event.id] ?? {}) })), [events, state.calendarOverrides]);
+  const upcoming = useMemo(() => calendarEvents.filter((event) => new Date(event.start).getTime() >= Math.max(referenceTime, seasonStart)).slice(0, 40), [calendarEvents, referenceTime]);
+  const pastEvents = useMemo(() => calendarEvents.filter((event) => new Date(event.start).getTime() < referenceTime).sort((a, b) => b.start.localeCompare(a.start)), [calendarEvents, referenceTime]);
   const nextEvents = upcoming.slice(0, 4);
   const nextGame = upcoming.find((event) => event.type === "game" || event.type === "tournament");
   const matchdayEvent = selectedEvent && (selectedEvent.type === "game" || selectedEvent.type === "tournament") ? selectedEvent : nextGame;
@@ -275,6 +286,24 @@ export default function CoachingTool() {
       ...state,
       attendance: { ...state.attendance, [eventId]: nextAttendance },
     }, profiles.map((player) => operation("attendance", `${eventId}:${player.id}`, "present")));
+  }
+
+  function saveCalendarEvent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingCalendarEvent) return;
+    const form = new FormData(event.currentTarget);
+    const start = new Date(String(form.get("start") ?? ""));
+    const end = new Date(String(form.get("end") ?? ""));
+    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) { setNotice("Bitte einen gültigen Zeitraum angeben."); return; }
+    const updated: CalendarEventOverride = {
+      ...editingCalendarEvent,
+      title: String(form.get("title") ?? "").trim().slice(0, 120) || "Termin",
+      start: start.toISOString(), end: end.toISOString(), location: String(form.get("location") ?? "").trim().slice(0, 160),
+      description: String(form.get("description") ?? "").trim().slice(0, 1000), type: String(form.get("type") ?? "other") as CalendarEvent["type"], allDay: false,
+    };
+    setEditingCalendarEvent(null);
+    setSelectedEvent(updated);
+    void save({ ...state, calendarOverrides: { ...state.calendarOverrides, [updated.id]: updated } }, [operation("calendar_event", updated.id, updated)]);
   }
 
   function saveProfile(event: FormEvent<HTMLFormElement>) {
@@ -414,9 +443,9 @@ export default function CoachingTool() {
     if (!await save({ ...state, tactics: { ...state.tactics, [id]: value } }, [operation("tactic", id, value)])) throw new Error("Taktik konnte nicht gelöscht werden.");
   }
 
-  const eligibleEventLineupIds = useMemo(() => events
+  const eligibleEventLineupIds = useMemo(() => calendarEvents
     .filter((event) => (event.type === "game" || event.type === "tournament") && new Date(event.start).getTime() >= seasonStart)
-    .map(eventLineupId), [events]);
+    .map(eventLineupId), [calendarEvents]);
   const appearanceCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     eligibleEventLineupIds.forEach((lineupId) => {
@@ -549,13 +578,16 @@ export default function CoachingTool() {
               <div className="view-heading compact"><div><p className="section-index">GOOGLE KALENDER · LIVE</p><h1>Termine &amp; Teilnahme.</h1><p>Spiele und Trainings werden automatisch aus dem D1-Kalender übernommen.</p></div></div>
               <div className="calendar-layout">
                 <div className="calendar-list">
+                  <div className="calendar-list-heading">Kommende Termine</div>
                   {upcoming.map((event) => <EventCard key={event.id} event={event} active={selectedEvent?.id === event.id} onOpen={openEvent} />)}
+                  <div className="calendar-list-heading past">Vergangene Termine</div>
+                  {pastEvents.length ? pastEvents.map((event) => <EventCard key={event.id} event={event} active={selectedEvent?.id === event.id} onOpen={openEvent} />) : <p className="calendar-empty">Noch keine vergangenen Termine im Kalender.</p>}
                 </div>
                 <aside className="event-detail">
                   {selectedEvent ? selectedEvent.type === "training" ? (
-                    <AttendancePanel event={selectedEvent} profiles={profiles} attendance={state.attendance[selectedEvent.id] ?? {}} reasons={state.attendanceReasons[selectedEvent.id] ?? {}} onSet={setAttendance} onAll={setAllPresent} />
+                    <AttendancePanel event={selectedEvent} profiles={profiles} attendance={state.attendance[selectedEvent.id] ?? {}} reasons={state.attendanceReasons[selectedEvent.id] ?? {}} onSet={setAttendance} onAll={setAllPresent} onEdit={() => setEditingCalendarEvent(selectedEvent)} />
                   ) : (
-                    <><p className="section-index">{eventLabel(selectedEvent.type)}</p><h2>{selectedEvent.title}</h2><p>{formatDate(selectedEvent.start)}</p><p>{selectedEvent.location}</p><div className="card-actions"><button onClick={() => openEvent(selectedEvent, "lineup")}>Kader planen</button><button className="secondary" onClick={() => openEvent(selectedEvent, "matchday")}>Spieltag erfassen</button></div></>
+                    <><div className="detail-head"><div><p className="section-index">{eventLabel(selectedEvent.type)}</p><h2>{selectedEvent.title}</h2><p>{formatDate(selectedEvent.start)}</p><p>{selectedEvent.location}</p></div><button className="text-button" type="button" onClick={() => setEditingCalendarEvent(selectedEvent)}>Termin bearbeiten</button></div><div className="card-actions"><button onClick={() => openEvent(selectedEvent, "lineup")}>Kader planen</button><button className="secondary" onClick={() => openEvent(selectedEvent, "matchday")}>Spieltag erfassen</button></div></>
                   ) : <div className="empty-detail"><span>←</span><p>Termin auswählen, um Anwesenheit, Kader oder Statistik zu bearbeiten.</p></div>}
                 </aside>
               </div>
@@ -637,6 +669,8 @@ export default function CoachingTool() {
           )}
         </>
       )}
+
+      {editingCalendarEvent && <CalendarEventDialog event={editingCalendarEvent} onClose={() => setEditingCalendarEvent(null)} onSubmit={saveCalendarEvent} />}
 
       {editingProfile && <ProfileDialog profile={editingProfile} onClose={() => setEditingProfile(null)} onSubmit={saveProfile} />}
       {diagnosticPlayer && <DiagnosticDialog profile={diagnosticPlayer} onClose={() => setDiagnosticPlayer(null)} onSubmit={addDiagnostic} />}
@@ -724,10 +758,14 @@ function EventCard({ event, active, onOpen }: { event: CalendarEvent; active?: b
   return <article className={`event-card type-${event.type}${active ? " active" : ""}`}><div className="event-card-top"><span>{eventLabel(event.type)}</span><time>{formatDate(event.start)}</time></div><h3>{event.title}</h3><p>{event.location || "Ort noch offen"}</p><button type="button" onClick={() => onOpen(event, target)}>{event.type === "training" ? "Teilnahme eintragen" : event.type === "other" ? "Termin öffnen" : "Kader planen"} →</button></article>;
 }
 
-function AttendancePanel({ event, profiles, attendance, reasons, onSet, onAll }: { event: CalendarEvent; profiles: Profile[]; attendance: Record<string, AttendanceStatus>; reasons: Record<string, AbsenceReason>; onSet: (eventId: string, id: string, status: AttendanceStatus, reason?: AbsenceReason) => void; onAll: (eventId: string) => void }) {
+function AttendancePanel({ event, profiles, attendance, reasons, onSet, onAll, onEdit }: { event: CalendarEvent; profiles: Profile[]; attendance: Record<string, AttendanceStatus>; reasons: Record<string, AbsenceReason>; onSet: (eventId: string, id: string, status: AttendanceStatus, reason?: AbsenceReason) => void; onAll: (eventId: string) => void; onEdit: () => void }) {
   const [reasonPlayer, setReasonPlayer] = useState<string | null>(null);
   const absenceReasons: AbsenceReason[] = ["Krankheit", "Verletzung", "Privat", "Schul-Event"];
-  return <><div className="detail-head"><div><p className="section-index">TRAININGSTEILNAHME</p><h2>{event.title}</h2><p>{formatDate(event.start)}</p></div><button className="text-button" onClick={() => onAll(event.id)}>Alle anwesend</button></div><div className="attendance-list">{profiles.map((player) => <div className="attendance-row" key={player.id}><div><Image src={`/api/player-image?name=${encodeURIComponent(player.firstName)}`} alt="" width={38} height={38} unoptimized /><strong>{player.firstName}</strong>{attendance[player.id] === "excused" && reasons[player.id] && <small className="attendance-reason">{reasons[player.id]}</small>}</div><div className="attendance-options">{(["present", "excused", "absent"] as AttendanceStatus[]).map((status) => <button key={status} className={`${status}${attendance[player.id] === status ? " selected" : ""}`} onClick={() => status === "excused" ? setReasonPlayer(player.id) : onSet(event.id, player.id, status)} aria-label={`${player.firstName}: ${{ present: "anwesend", excused: "entschuldigt", absent: "abwesend" }[status]}`}><span />{{ present: "Anwesend", excused: "Entschuldigt", absent: "Abwesend" }[status]}</button>)}{reasonPlayer === player.id && <select className="attendance-reason-select" aria-label={`${player.firstName}: Grund auswählen`} value={reasons[player.id] ?? ""} onChange={(event) => { const reason = event.target.value as AbsenceReason; if (reason) { onSet(event.currentTarget.name || "", player.id, "excused", reason); setReasonPlayer(null); } }} name={event.id}><option value="">Grund wählen</option>{absenceReasons.map((reason) => <option key={reason} value={reason}>{reason}</option>)}</select>}</div></div>)}</div></>;
+  return <><div className="detail-head"><div><p className="section-index">TRAININGSTEILNAHME</p><h2>{event.title}</h2><p>{formatDate(event.start)}</p></div><div className="detail-actions"><button className="text-button" type="button" onClick={onEdit}>Termin bearbeiten</button><button className="text-button" onClick={() => onAll(event.id)}>Alle anwesend</button></div></div><div className="attendance-list">{profiles.map((player) => <div className="attendance-row" key={player.id}><div><Image src={`/api/player-image?name=${encodeURIComponent(player.firstName)}`} alt="" width={38} height={38} unoptimized /><strong>{player.firstName}</strong>{attendance[player.id] === "excused" && reasons[player.id] && <small className="attendance-reason">{reasons[player.id]}</small>}</div><div className="attendance-options">{(["present", "excused", "absent"] as AttendanceStatus[]).map((status) => <button key={status} className={`${status}${attendance[player.id] === status ? " selected" : ""}`} onClick={() => status === "excused" ? setReasonPlayer(player.id) : onSet(event.id, player.id, status)} aria-label={`${player.firstName}: ${{ present: "anwesend", excused: "entschuldigt", absent: "abwesend" }[status]}`}><span />{{ present: "Anwesend", excused: "Entschuldigt", absent: "Abwesend" }[status]}</button>)}{reasonPlayer === player.id && <select className="attendance-reason-select" aria-label={`${player.firstName}: Grund auswählen`} value={reasons[player.id] ?? ""} onChange={(event) => { const reason = event.target.value as AbsenceReason; if (reason) { onSet(event.currentTarget.name || "", player.id, "excused", reason); setReasonPlayer(null); } }} name={event.id}><option value="">Grund wählen</option>{absenceReasons.map((reason) => <option key={reason} value={reason}>{reason}</option>)}</select>}</div></div>)}</div></>;
+}
+
+function CalendarEventDialog({ event, onClose, onSubmit }: { event: CalendarEvent; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+  return <div className="modal-backdrop" role="presentation"><div className="coach-modal calendar-event-dialog" role="dialog" aria-modal="true" aria-labelledby="calendar-event-title"><button className="modal-close" type="button" aria-label="Schließen" onClick={onClose}>×</button><p className="section-index">KALENDER · COACHING TOOL</p><h2 id="calendar-event-title">Termin bearbeiten</h2><p className="calendar-edit-note">Änderungen gelten im Coaching Tool. Der öffentliche Google-Kalender bleibt unverändert.</p><form onSubmit={onSubmit}><label>Titel<input name="title" defaultValue={event.title} maxLength={120} required /></label><div className="form-grid"><label>Beginn<input name="start" type="datetime-local" defaultValue={localDateTimeValue(event.start)} required /></label><label>Ende<input name="end" type="datetime-local" defaultValue={localDateTimeValue(event.end)} required /></label></div><div className="form-grid"><label>Art<select name="type" defaultValue={event.type}><option value="training">Training</option><option value="game">Spiel</option><option value="tournament">Turnier</option><option value="other">Termin</option></select></label><label>Ort<input name="location" defaultValue={event.location} maxLength={160} /></label></div><label>Notiz<textarea name="description" defaultValue={event.description} maxLength={1000} /></label><div className="modal-actions"><button className="text-button" type="button" onClick={onClose}>Abbrechen</button><button className="primary-button" type="submit">Termin speichern</button></div></form></div></div>;
 }
 
 function seasonStatus(key: SeasonStatKey, value: number | null): "good" | "average" | "critical" | "neutral" {
