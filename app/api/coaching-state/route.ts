@@ -76,7 +76,8 @@ function assembleState(rows: RecordRow[]) {
       if (playerId) (state.diagnostics[playerId] ??= []).push(row.data);
     }
     if (row.scope === "tactic" && row.data && typeof row.data === "object") {
-      state.tactics[row.record_key] = row.data;
+      const tactic = row.data as { deleted?: unknown };
+      if (tactic.deleted !== true) state.tactics[row.record_key] = row.data;
     }
   }
 
@@ -89,6 +90,13 @@ function assembleState(rows: RecordRow[]) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function validTacticLayout(value: unknown) {
+  if (!isRecord(value) || !isRecord(value.positions) || !isRecord(value.ball)) return false;
+  const validPoint = (point: unknown) => isRecord(point) && typeof point.x === "number" && Number.isFinite(point.x) && point.x >= 0 && point.x <= 100 && typeof point.y === "number" && Number.isFinite(point.y) && point.y >= 0 && point.y <= 100;
+  const positionMap = value.positions as Record<string, unknown>;
+  return ["st", "lf", "rf", "zm", "zdm", "lv", "iv", "rv", "tw"].every((id) => validPoint(positionMap[id])) && validPoint(value.ball);
 }
 
 function validOperation(value: unknown): value is Operation {
@@ -127,16 +135,11 @@ function validOperation(value: unknown): value is Operation {
     });
   }
   if (value.scope === "tactic") {
-    if (!["attack", "defense", "corner"].includes(value.key) || !isRecord(value.value)) return false;
+    if (["attack", "defense", "corner"].includes(value.key)) return validTacticLayout(value.value);
+    if (!/^custom-[a-z0-9-]{8,80}$/.test(value.key) || !isRecord(value.value)) return false;
     const tactic = value.value;
-    const tacticPositions = tactic.positions;
-    const tacticBall = tactic.ball;
-    if (!isRecord(tacticPositions) || !isRecord(tacticBall)) return false;
-    const validPoint = (point: unknown) => isRecord(point) &&
-      typeof point.x === "number" && Number.isFinite(point.x) && point.x >= 0 && point.x <= 100 &&
-      typeof point.y === "number" && Number.isFinite(point.y) && point.y >= 0 && point.y <= 100;
-    return ["st", "lf", "rf", "zm", "zdm", "lv", "iv", "rv", "tw"].every((id) => validPoint(tacticPositions[id])) &&
-      validPoint(tacticBall);
+    const templates = ["attack", "defense", "corner", "blank"];
+    return tactic.id === value.key && typeof tactic.name === "string" && tactic.name.trim().length > 0 && tactic.name.length <= 40 && templates.includes(String(tactic.baseScenario)) && validTacticLayout(tactic.layout) && (tactic.deleted === undefined || typeof tactic.deleted === "boolean");
   }
   return false;
 }
@@ -226,3 +229,4 @@ export async function PATCH(request: Request) {
     return privateJson({ error: "Coaching-Daten konnten nicht gespeichert werden." }, { status: 502 });
   }
 }
+
