@@ -628,15 +628,15 @@ function PlayerCard({ profile, flipped, appearances, goals, assists, participati
 type DiagnosticStatus = "good" | "mid-good" | "average" | "below" | "critical" | "bad" | "neutral";
 
 function diagnosticStatus(metric?: DiagnosticMetric | null): DiagnosticStatus {
-  const rating = `${metric?.rating ?? ""} ${metric?.category ?? ""}`.toLowerCase();
-  if (/sehr gut|excellent|top/.test(rating)) return "good";
-  if (/\bgut\b/.test(rating)) return "mid-good";
-  if (/befriedigend/.test(rating)) return "below";
+  const category = String(metric?.category ?? "").trim().toUpperCase();
+  if (/^A(?:\/B)?$/.test(category)) return "good";
+  if (/^B(?:\/C)?$/.test(category)) return "average";
+  if (category === "C") return "critical";
+  const rating = `${metric?.rating ?? ""}`.toLowerCase();
+  if (/ausgezeichnet|sehr gut|excellent|top/.test(rating)) return "good";
+  if (/gut|befriedigend|durchschnittlich|mittel/.test(rating)) return "average";
   if (/ausreichend/.test(rating)) return "critical";
-  if (/mangelhaft/.test(rating)) return "bad";
-  if (/unterdurchschnitt|schwach/.test(rating)) return "below";
-  if (/durchschnitt|mittel/.test(rating)) return "average";
-  if (/schlecht|ungenügend/.test(rating)) return "bad";
+  if (/mangelhaft|unterdurchschnitt|schwach|schlecht|ungenügend/.test(rating)) return "bad";
   return "neutral";
 }
 
