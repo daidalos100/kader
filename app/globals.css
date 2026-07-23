@@ -574,6 +574,16 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
 .stats-table th { padding: 15px; color: #777980; font-size: .61rem; letter-spacing: .08em; text-align: left; text-transform: uppercase; }
 .stats-table td { padding: 13px 15px; border-top: 1px solid rgba(244,243,239,.09); color: #c7c7c8; }
 .stats-table td:first-child { display: flex; align-items: center; gap: 10px; color: var(--white); }
+.stat-value { display: inline-flex; align-items: center; gap: 7px; color: var(--white); font-weight: 800; font-variant-numeric: tabular-nums; }
+.stat-value i { width: 8px; height: 8px; border-radius: 50%; background: #62646b; box-shadow: 0 0 0 5px rgba(98,100,107,.14); }
+.stat-value.stat-good { color: #7edb86; }
+.stat-value.stat-good i { background: #55b95d; box-shadow: 0 0 0 5px rgba(85,185,93,.15); }
+.stat-value.stat-average { color: #f0d95d; }
+.stat-value.stat-average i { background: #e2c746; box-shadow: 0 0 0 5px rgba(226,199,70,.14); }
+.stat-value.stat-critical { color: #ff7275; }
+.stat-value.stat-critical i { background: #e34a50; box-shadow: 0 0 0 5px rgba(227,74,80,.15); }
+.stat-value.stat-neutral { color: #a8aab0; }
+.stat-crown { display: inline-flex; align-items: center; margin-left: 2px; font-size: .82rem; line-height: 1; }
 .match-editor { position: sticky; top: 110px; padding: 24px; border: 1px solid rgba(244,243,239,.15); background: #101115; }
 .match-editor > label, .match-panel > label, .coach-modal label { display: grid; gap: 7px; color: #c4c5c9; font-size: .62rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .match-editor select, .match-panel input, .coach-modal input, .coach-modal select, .coach-modal textarea { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid rgba(244,243,239,.38); border-radius: 0; outline: 0; background: #090a0d; color: var(--white); }
