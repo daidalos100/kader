@@ -478,11 +478,12 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .static-card .fc-metrics .season-metric-value { grid-template-columns: auto minmax(0, 1fr); min-width: 0; padding: 0; }
 .static-card .season-metric-value strong { min-width: 0; overflow: visible; font-size: clamp(1.25rem, 2.1vw, 1.7rem); letter-spacing: -.04em; white-space: nowrap; }
 .static-card .fc-metrics > .season-metric > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.static-card .diagnostic-overview-compact { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 6px; width: 100%; margin-top: 10px; }
-.static-card .diagnostic-overview-compact > strong { grid-column: 1 / -1; margin-bottom: 1px; font-size: .56rem; }
-.static-card .diagnostic-overview-compact > div { justify-content: flex-start; gap: 5px; min-width: 0; padding: 2px 0; border: 0; font-size: .56rem; }
+.static-card .diagnostic-overview-compact { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 8px; width: 100%; margin-top: 11px; padding: 10px 6px 2px; border-top: 1px solid rgba(244,243,239,.11); }
+.static-card .diagnostic-overview-compact > strong { grid-column: 1 / -1; margin: 0 0 4px; font-size: .58rem; }
+.static-card .diagnostic-overview-compact > div { display: flex; align-items: center; justify-content: flex-start; gap: 7px; min-width: 0; padding: 0; border: 0; color: #d7d8da; font-size: .62rem; font-weight: 800; line-height: 1; }
+.static-card .diagnostic-overview-compact > div > .diagnostic-dot { flex: 0 0 10px; width: 10px; height: 10px; }
 .static-card .diagnostic-overview-compact > div > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.static-card .diagnostic-overview-compact .diagnostic-trend { margin-left: auto; font-size: .52rem; }
+.static-card .diagnostic-overview-compact .diagnostic-crown { margin-left: 3px; font-size: .72rem; }
 .fc-metrics span { color: #85878d; font-size: .58rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .diagnostic-overview { display: grid; gap: 0; width: 100%; margin-top: 12px; }
 .diagnostic-overview > strong { margin-bottom: 5px; font-size: .65rem; letter-spacing: .08em; text-transform: uppercase; }
@@ -505,10 +506,10 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .diagnostic-detail-record-head time { color: #85878d; font-size: .65rem; }
 .diagnostic-detail-record > div:not(.diagnostic-detail-record-head) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(244,243,239,.1); }
 .diagnostic-detail-record > div:not(.diagnostic-detail-record-head) > span { display: grid; gap: 3px; }
-.diagnostic-detail-label { display: grid !important; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 8px; }
-.diagnostic-detail-label > strong { min-width: 0; }
-.diagnostic-detail-label > small { grid-column: 2; }
-.diagnostic-detail-label > .diagnostic-dot { grid-row: 1 / span 2; }
+.diagnostic-detail-label { display: grid !important; grid-template-columns: 12px minmax(0, 1fr); grid-template-rows: auto auto; align-items: center; column-gap: 8px; }
+.diagnostic-detail-label > .diagnostic-dot { grid-column: 1; grid-row: 1; align-self: center; }
+.diagnostic-detail-label > strong { grid-column: 2; grid-row: 1; min-width: 0; }
+.diagnostic-detail-label > small { grid-column: 2; grid-row: 2; }
 .diagnostic-detail-record strong { color: #d9dadd; }
 .diagnostic-detail-record b { text-align: right; }
 .diagnostic-detail-record small { display: block; color: #777a80; font-size: .58rem; font-weight: 500; }
