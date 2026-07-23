@@ -551,7 +551,7 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .matchday-capture { min-height: 620px; padding: clamp(20px, 3vw, 38px); background: radial-gradient(circle at 50% 0, rgba(239,22,28,.16), transparent 48%), #101115; }
 .matchday-step { display: grid; align-content: start; min-height: 540px; }
 .matchday-step h2 { margin: 8px 0 28px; font-size: clamp(1.85rem, 4.4vw, 3.6rem); line-height: .95; text-transform: uppercase; }
-.matchday-start { min-height: 340px; border: 1px solid #ff6569; background: var(--red); color: var(--white); font-size: clamp(2rem, 6vw, 5rem); font-weight: 900; letter-spacing: -.05em; cursor: pointer; transition: transform .15s ease, background .15s ease; }
+.matchday-start { min-height: 430px; border: 1px solid #ff6569; background: var(--red); color: var(--white); font-size: clamp(2rem, 6vw, 5rem); font-weight: 900; letter-spacing: -.05em; cursor: pointer; transition: transform .15s ease, background .15s ease; }
 .matchday-start:hover, .matchday-start:focus-visible { background: #f62c31; transform: translateY(-2px); }
 .matchday-result { display: grid; gap: 7px; width: min(260px, 100%); margin-top: 16px; color: #aeb0b6; font-size: .61rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
 .matchday-result input { min-height: 46px; padding: 10px 12px; border: 1px solid rgba(244,243,239,.38); border-radius: 0; outline: 0; background: #090a0d; color: var(--white); font: inherit; }
@@ -819,7 +819,7 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
   .matchday-step { min-height: 0; }
   .matchday-step h2 { margin-bottom: 18px; }
   .matchday-step.start > .section-index, .matchday-step.start > h2 { display: none; }
-  .matchday-start { min-height: 210px; }
+  .matchday-start { min-height: 260px; }
   .matchday-result { width: 100%; }
   .matchday-player-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .matchday-player-button { min-height: 106px; grid-template-columns: 1fr; grid-template-rows: auto auto auto; justify-items: center; gap: 6px; padding: 10px 6px; text-align: center; }
@@ -831,7 +831,7 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
   body.matchday-focus .matchday-heading > div:first-child { display: none; }
   body.matchday-focus .matchday-heading { padding-top: 0; }
   body.matchday-focus .matchday-capture { padding-top: 10px; }
-  body.matchday-focus .matchday-start { min-height: 230px; }
+  body.matchday-focus .matchday-start { min-height: 280px; }
   .match-player-list > div { grid-template-columns: minmax(100px, 1fr) 66px 66px; }
   .next-event-card { min-height: 300px; padding: 28px 20px; }
   .history-panel { margin-top: 36px; }
