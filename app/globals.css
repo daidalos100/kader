@@ -768,10 +768,10 @@ body.matchday-focus .matchday-heading { position: sticky; z-index: 15; top: 0; p
   .matchday-heading { gap: 8px; padding-bottom: 12px; border-bottom: 0; }
   .matchday-heading > div:first-child .section-index, .matchday-heading > div:first-child p:last-child { display: none; }
   .matchday-heading h1 { margin: 0; font-size: 1.7rem; line-height: 1; letter-spacing: -.04em; }
-  .matchday-heading-actions { width: 100%; align-items: stretch; }
+  .matchday-heading-actions { display: grid; width: 100%; grid-template-columns: 1fr; align-items: stretch; gap: 8px; }
   .matchday-heading label { width: 100%; min-width: 0; font-size: .52rem; }
   .matchday-heading select { min-height: 42px; font-size: .68rem; }
-  .matchday-focus-button { min-height: 42px; padding-inline: 10px; font-size: .5rem; }
+  .matchday-focus-button { width: 100%; min-height: 48px; padding-inline: 14px; font-size: .58rem; }
   .matchday-capture { min-height: 0; padding: 16px 12px; }
   .matchday-step { min-height: 0; }
   .matchday-step h2 { margin-bottom: 18px; }
