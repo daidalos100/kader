@@ -13,7 +13,7 @@ test("mobile and accessibility safeguards stay present", async () => {
   ]);
   for (const marker of [
     "@media (max-width: 820px)", "@media (max-width: 560px)", "@media (max-width: 380px)",
-    "prefers-reduced-motion", "focus-visible", "safe-area-inset-left", "pointer: coarse", "overscroll-behavior-x: contain", "min-height: 44px", "calendar-event-dialog",
+    "prefers-reduced-motion", "focus-visible", "safe-area-inset-left", "pointer: coarse", "overscroll-behavior-x: contain", "overscroll-behavior: contain", "min-height: 44px", "calendar-event-dialog", "100dvh", "touch-action: manipulation",
   ]) assert.match(css, new RegExp(marker.replace(/[()]/g, "\\$&")));
   for (const marker of ["aria-live=\"polite\"", "<dialog", "aria-labelledby", "role=\"status\""]) {
     assert.ok(component.includes(marker), `missing ${marker}`);
@@ -22,6 +22,10 @@ test("mobile and accessibility safeguards stay present", async () => {
   assert.ok(component.includes("aria-expanded={open}"));
   assert.ok(component.includes('aria-label="Teamkarten nach Position filtern"'));
   assert.ok(component.includes("player.secondaryPosition === positionFilter"));
+  assert.ok(component.includes("const onKeyDown = (keyEvent: KeyboardEvent)"));
+  assert.ok(component.includes("const onKeyDown = (event: KeyboardEvent)"));
+  assert.ok(css.includes(".attendance-options { display: flex; flex-wrap: wrap; gap: 5px; }"));
+  assert.ok(css.includes(".static-card, .static-card .fc-card-inner { height: 760px; }"));
 });
 
 test("security and conflict controls stay present", async () => {
