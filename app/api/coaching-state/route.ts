@@ -4,7 +4,7 @@ import { isAuthenticated } from "../../auth";
 import { getSupabaseConfig, supabaseHeaders } from "../../lib/supabase";
 
 const SEASON_ID = "d1-2026-27";
-const allowedScopes = new Set(["roster", "profile", "attendance", "match_meta", "match_entry", "match_goal", "diagnostic", "tactic"]);
+const allowedScopes = new Set(["roster", "profile", "attendance", "match_meta", "match_entry", "diagnostic", "tactic"]);
 
 type RecordRow = {
   scope: string;
@@ -60,23 +60,17 @@ function assembleState(rows: RecordRow[]) {
       }
     }
     if (row.scope === "match_meta" && row.data && typeof row.data === "object") {
-      const result = String((row.data as { result?: unknown }).result ?? "").slice(0, 20);
+      const meta = row.data as { result?: unknown; goalEvents?: unknown };
+      const result = String(meta.result ?? "").slice(0, 20);
       state.matches[row.record_key] ??= { result: "", entries: {}, goalEvents: [] };
       state.matches[row.record_key].result = result;
+      state.matches[row.record_key].goalEvents = Array.isArray(meta.goalEvents) ? meta.goalEvents.filter((goal) => isRecord(goal) && goal.deleted !== true) : [];
     }
     if (row.scope === "match_entry" && row.data && typeof row.data === "object") {
       const [eventId, playerId] = splitCompositeKey(row.record_key);
       if (eventId && playerId) {
         state.matches[eventId] ??= { result: "", entries: {}, goalEvents: [] };
         state.matches[eventId].entries[playerId] = row.data;
-      }
-    }
-    if (row.scope === "match_goal" && row.data && typeof row.data === "object") {
-      const [eventId] = splitCompositeKey(row.record_key);
-      const goal = row.data as { deleted?: unknown };
-      if (eventId && goal.deleted !== true) {
-        state.matches[eventId] ??= { result: "", entries: {}, goalEvents: [] };
-        state.matches[eventId].goalEvents.push(row.data);
       }
     }
     if (row.scope === "diagnostic" && row.data && typeof row.data === "object") {
@@ -117,20 +111,20 @@ function validOperation(value: unknown): value is Operation {
 
   if (value.scope === "roster") return typeof value.value === "string" && value.value.trim().length > 0 && value.value.length <= 30;
   if (value.scope === "attendance") return ["present", "excused", "absent"].includes(String(value.value));
-  if (value.scope === "match_meta") return isRecord(value.value) && typeof value.value.result === "string" && value.value.result.length <= 20;
+  if (value.scope === "match_meta") {
+    if (!isRecord(value.value) || typeof value.value.result !== "string" || value.value.result.length > 20) return false;
+    const goalEvents = value.value.goalEvents;
+    if (goalEvents === undefined) return true;
+    return Array.isArray(goalEvents) && goalEvents.length <= 60 && goalEvents.every((goal) => isRecord(goal) &&
+      typeof goal.id === "string" && goal.id.length >= 8 && goal.id.length <= 80 &&
+      typeof goal.scorerId === "string" && /^[a-z0-9-]{1,80}$/.test(goal.scorerId) &&
+      (goal.assistId === null || (typeof goal.assistId === "string" && /^[a-z0-9-]{1,80}$/.test(goal.assistId))) &&
+      typeof goal.createdAt === "string" && goal.createdAt.length <= 40);
+  }
   if (value.scope === "match_entry") {
     return isRecord(value.value) && typeof value.value.appearance === "boolean" &&
       Number.isInteger(value.value.goals) && Number(value.value.goals) >= 0 && Number(value.value.goals) <= 30 &&
       Number.isInteger(value.value.assists) && Number(value.value.assists) >= 0 && Number(value.value.assists) <= 30;
-  }
-  if (value.scope === "match_goal") {
-    if (!isRecord(value.value)) return false;
-    const goal = value.value;
-    return typeof goal.id === "string" && goal.id.length >= 8 && goal.id.length <= 80 &&
-      typeof goal.scorerId === "string" && /^[a-z0-9-]{1,80}$/.test(goal.scorerId) &&
-      (goal.assistId === null || (typeof goal.assistId === "string" && /^[a-z0-9-]{1,80}$/.test(goal.assistId))) &&
-      typeof goal.createdAt === "string" && goal.createdAt.length <= 40 &&
-      (goal.deleted === undefined || typeof goal.deleted === "boolean");
   }
   if (value.scope === "profile") {
     if (!isRecord(value.value)) return false;
