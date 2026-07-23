@@ -96,7 +96,7 @@ test("calendar keeps its chronology from 07.07.2026 and stores local event overr
     source("app/lib/calendar.ts"), source("app/components/CoachingTool.tsx"), source("app/api/coaching-state/route.ts"), source("supabase/phase5-calendar-overrides.sql"),
   ]);
   assert.ok(calendar.includes("24 * 365"));
-  for (const marker of ["calendarVisibleFrom", "next-calendar-event", "calendarOverrides", "Termin bearbeiten", "Google-Kalender bleibt unverändert", "TEILNAHME", "trainingEventIds", "not_selected", "Nicht im Kader"]) assert.ok(component.includes(marker), `missing ${marker}`);
+  for (const marker of ["calendarVisibleFrom", "next-calendar-event", "calendarOverrides", "Termin bearbeiten", "Google-Kalender bleibt unverändert", "TEILNAHME", "not_selected", "Nicht im Kader", "Noch nicht erfasst", "Entschuldigt${reason"]) assert.ok(component.includes(marker), `missing ${marker}`);
   assert.ok(route.includes('"calendar_event"'));
   assert.ok(migration.includes("calendar_event"));
 });
