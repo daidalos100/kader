@@ -135,7 +135,6 @@ export default function CoachingTool() {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
   const [detailPlayer, setDetailPlayer] = useState<Profile | null>(null);
-  const [flipped, setFlipped] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [pendingSaves, setPendingSaves] = useState(0);
   const [revisions, setRevisions] = useState<Record<string, number>>({});
@@ -162,11 +161,12 @@ export default function CoachingTool() {
   const nextEvents = upcoming.slice(0, 4);
   const nextGame = upcoming.find((event) => event.type === "game" || event.type === "tournament");
   const matchdayEvent = selectedEvent && (selectedEvent.type === "game" || selectedEvent.type === "tournament") ? selectedEvent : nextGame;
+  const matchdayLineupId = matchdayEvent ? eventLineupId(matchdayEvent) : null;
 
   useEffect(() => {
     let cancelled = false;
-    if (!matchdayEvent) { setMatchdayLineup([]); return; }
-    fetch(`/api/lineup?lineupId=${encodeURIComponent(eventLineupId(matchdayEvent))}`, { cache: "no-store" })
+    if (!matchdayLineupId) return;
+    fetch(`/api/lineup?lineupId=${encodeURIComponent(matchdayLineupId)}`, { cache: "no-store" })
       .then(async (response) => response.ok ? await response.json() as { lineup?: SavedLineup } : { lineup: {} })
       .then((data) => {
         if (cancelled) return;
@@ -185,7 +185,7 @@ export default function CoachingTool() {
       })
       .catch(() => { if (!cancelled) setMatchdayLineup([]); });
     return () => { cancelled = true; };
-  }, [matchdayEvent?.id, profiles]);
+  }, [matchdayLineupId, profiles]);
 
   useEffect(() => {
     let cancelled = false;
@@ -356,17 +356,7 @@ export default function CoachingTool() {
     );
   }
 
-  function updateMatchEntry(eventId: string, id: string, patch: Partial<MatchEntry>) {
-    const current = state.matches[eventId] ?? { result: "", entries: {} };
-    const entry = current.entries[id] ?? { appearance: false, goals: 0, assists: 0 };
-    const nextEntry = { ...entry, ...patch };
-    void save(
-      { ...state, matches: { ...state.matches, [eventId]: { ...current, entries: { ...current.entries, [id]: nextEntry } } } },
-      [operation("match_entry", `${eventId}:${id}`, nextEntry)],
-    );
-  }
-
-  async function recordGoal(eventId: string, scorerId: string, assistId: string | null) {
+    async function recordGoal(eventId: string, scorerId: string, assistId: string | null) {
     const current = state.matches[eventId] ?? { result: "", entries: {}, goalEvents: [] };
     const scorer = current.entries[scorerId] ?? { appearance: false, goals: 0, assists: 0 };
     const assist = assistId ? current.entries[assistId] ?? { appearance: false, goals: 0, assists: 0 } : null;
@@ -613,7 +603,7 @@ export default function CoachingTool() {
 
           {tab === "matchday" && (
             <section className="coach-view matchday-view">
-              <MatchdayPanel
+              <MatchdayPanel key={matchdayEvent?.id ?? "no-match"}
                 event={matchdayEvent ?? null}
                 lineup={matchdayLineup}
                 profiles={profiles}
@@ -866,12 +856,6 @@ function DiagnosticDetailRecord({ diagnostic, previous, bestDisciplineKeys }: { 
   return <section className="diagnostic-detail-record"><div className="diagnostic-detail-record-head"><strong>{diagnostic.ageGroup || "Leistungsdiagnostik"}</strong><time>{diagnostic.date}</time></div>{diagnostic.metrics ? rows.map((row) => <DiagnosticMetricRow key={row.key} label={row.label} metric={row.metric!} unit={row.unit} previous={row.previous?.best ?? null} lowerIsBetter={row.lowerIsBetter} best={bestDisciplineKeys.has(row.key)} />) : <>{([['5 m Sprint', diagnostic.sprint5, previous?.sprint5, 's'], ['10 m Sprint', diagnostic.sprint10, previous?.sprint10, 's'], ['20 m Sprint', diagnostic.sprint20, previous?.sprint20, 's'], ['Agility', diagnostic.agility, previous?.agility, 's'], ['Ausdauer', diagnostic.endurance, previous?.endurance, ''], ['Sprungkraft', diagnostic.jump, previous?.jump, 'cm']] as const).map(([label, value, before, unit]) => <div key={label}><span><strong>{label}</strong></span><b>{value ?? "—"}{value !== null ? ` ${unit}` : ""}</b><Trend current={value} previous={before ?? null} lowerIsBetter={!['Ausdauer', 'Sprungkraft'].includes(label)} unit={unit} /></div>)}</>}</section>;
 }
 
-function Delta({ current, previous, lowerIsBetter }: { current: number | null; previous: number | null; lowerIsBetter: boolean }) {
-  if (current === null || previous === null || current === previous) return <em />;
-  const delta = current - previous; const positive = lowerIsBetter ? delta < 0 : delta > 0;
-  return <em className={positive ? "delta-positive" : "delta-negative"}>({delta > 0 ? "+" : ""}{delta.toFixed(2)})</em>;
-}
-
 function StatsTable({ rows, totalMatches }: { rows: Array<{ player: Profile; appearances: number; goals: number; assists: number; participation: number | null; appearanceEvents: StatEventDetail[]; goalEvents: StatEventDetail[]; assistEvents: StatEventDetail[]; trainingEvents: StatEventDetail[] }>; totalMatches: number }) {
   const [sortKey, setSortKey] = useState<StatSortKey>("player");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -912,13 +896,11 @@ function MatchdayPanel({ event, events, lineup, profiles, data, onChooseEvent, o
   const [scorerId, setScorerId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
-  useEffect(() => { setStep("start"); setScorerId(null); }, [event?.id]);
   useEffect(() => {
     document.body.classList.toggle("matchday-focus", focusMode);
     return () => document.body.classList.remove("matchday-focus");
   }, [focusMode]);
   const players = lineup;
-  const scorer = players.find((item) => item.player.id === scorerId)?.player;
   const nameFor = (id: string) => profiles.find((player) => player.id === id)?.firstName ?? "Spieler:in";
   async function chooseScorer(id: string) { setScorerId(id); setStep("assist"); }
   async function completeGoal(assistId: string | null) {
