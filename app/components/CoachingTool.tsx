@@ -40,6 +40,7 @@ type Diagnostic = {
   };
 };
 type DiagnosticMetric = { attempts: Array<number | string | null>; best: number | null; percentile: number | null; category: string | null; rating: string | null };
+type DiagnosticDisciplineKey = "sprint10" | "sprint20" | "agility" | "dribbling" | "shuttleRun" | "jump";
 type CoachingState = {
   roster: string[];
   profiles: Record<string, Partial<Profile>>;
@@ -370,6 +371,28 @@ export default function CoachingTool() {
       return rankDifference || a.player.firstName.localeCompare(b.player.firstName, "de");
     });
   const hasUnassignedPlayers = profiles.some((player) => !player.primaryPosition && !player.secondaryPosition);
+  const diagnosticBestByPlayer = useMemo(() => {
+    const candidates: Record<DiagnosticDisciplineKey, Array<{ playerId: string; value: number }>> = {
+      sprint10: [], sprint20: [], agility: [], dribbling: [], shuttleRun: [], jump: [],
+    };
+    profiles.forEach((player) => {
+      const latest = state.diagnostics[player.id]?.[0];
+      if (!latest?.metrics) return;
+      const metrics: Array<[DiagnosticDisciplineKey, number | null]> = [
+        ["sprint10", latest.metrics.sprint10.best], ["sprint20", latest.metrics.sprint20.best],
+        ["agility", latest.metrics.agility.best], ["dribbling", latest.metrics.dribbling.best],
+        ["shuttleRun", latest.metrics.shuttleRun.level], ["jump", latest.metrics.jump.best],
+      ];
+      metrics.forEach(([key, value]) => { if (value !== null && Number.isFinite(value)) candidates[key].push({ playerId: player.id, value }); });
+    });
+    const winners: Record<string, Set<DiagnosticDisciplineKey>> = {};
+    (Object.keys(candidates) as DiagnosticDisciplineKey[]).forEach((key) => {
+      const values = candidates[key]; if (!values.length) return;
+      const target = key === "shuttleRun" || key === "jump" ? Math.max(...values.map((item) => item.value)) : Math.min(...values.map((item) => item.value));
+      values.filter((item) => Math.abs(item.value - target) < 0.0001).forEach((item) => { (winners[item.playerId] ??= new Set()).add(key); });
+    });
+    return winners;
+  }, [profiles, state.diagnostics]);
 
   return (
     <main className="coach-shell">
@@ -487,7 +510,7 @@ export default function CoachingTool() {
               <div className="player-card-grid">
                 {sortedCardRows.map(({ player, appearances, goals, assists, participation }) => {
                   const history = state.diagnostics[player.id] ?? [];
-                  return <PlayerCard key={player.id} profile={player} flipped={Boolean(flipped[player.id])} appearances={appearances} goals={goals} assists={assists} participation={participation} history={history} onFlip={() => setFlipped((current) => ({ ...current, [player.id]: !current[player.id] }))} onEdit={() => setEditingProfile(player)} onDetails={() => setDetailPlayer(player)} />;
+                  return <PlayerCard key={player.id} profile={player} flipped={Boolean(flipped[player.id])} appearances={appearances} goals={goals} assists={assists} participation={participation} history={history} bestDisciplineKeys={diagnosticBestByPlayer[player.id] ?? new Set()} onFlip={() => setFlipped((current) => ({ ...current, [player.id]: !current[player.id] }))} onEdit={() => setEditingProfile(player)} onDetails={() => setDetailPlayer(player)} />;
                 })}
               </div>
             </section>
@@ -598,34 +621,35 @@ function AttendancePanel({ event, profiles, attendance, onSet, onAll }: { event:
   return <><div className="detail-head"><div><p className="section-index">TRAININGSTEILNAHME</p><h2>{event.title}</h2><p>{formatDate(event.start)}</p></div><button className="text-button" onClick={() => onAll(event.id)}>Alle anwesend</button></div><div className="attendance-list">{profiles.map((player) => <div className="attendance-row" key={player.id}><div><Image src={`/api/player-image?name=${encodeURIComponent(player.firstName)}`} alt="" width={38} height={38} unoptimized /><strong>{player.firstName}</strong></div><div className="attendance-options">{(["present", "excused", "absent"] as AttendanceStatus[]).map((status) => <button key={status} className={`${status}${attendance[player.id] === status ? " selected" : ""}`} onClick={() => onSet(event.id, player.id, status)} aria-label={`${player.firstName}: ${{ present: "anwesend", excused: "entschuldigt", absent: "abwesend" }[status]}`}><span />{{ present: "Anwesend", excused: "Entschuldigt", absent: "Abwesend" }[status]}</button>)}</div></div>)}</div></>;
 }
 
-function PlayerCard({ profile, flipped, appearances, goals, assists, participation, history, onFlip, onEdit, onDetails }: { profile: Profile; flipped: boolean; appearances: number; goals: number; assists: number; participation: number | null; history: Diagnostic[]; onFlip: () => void; onEdit: () => void; onDetails: () => void }) {
-  return <article className={`fc-card${flipped ? " flipped" : ""}`}><div className="fc-card-inner"><div className="fc-face fc-front"><button className="card-flip-area" onClick={onFlip} aria-label={`${profile.firstName}: Leistungsseite anzeigen`}><div className="shirt-number">{profile.shirtNumber || "—"}</div><Image src={`/api/player-image?name=${encodeURIComponent(profile.firstName)}`} alt={profile.firstName} width={260} height={260} unoptimized /><div className="fc-name">{profile.firstName}</div><div className="fc-positions"><strong>{profile.primaryPosition || "POS"}</strong><span>{profile.secondaryPosition || "—"}</span></div><div className="fc-foot">Starker Fuß <strong>{{ left: "Links", right: "Rechts", both: "Beide", "": "—" }[profile.strongFoot]}</strong></div><p>{profile.personality || "Spielerpersönlichkeit noch nicht ergänzt."}</p></button><button className="card-edit" onClick={onEdit}>Profil bearbeiten</button></div><div className="fc-face fc-back"><button className="card-flip-area" onClick={onFlip} aria-label={`${profile.firstName}: Profilseite anzeigen`}><p className="section-index">SAISONWERTE</p><h3>{profile.firstName}</h3><div className="fc-metrics"><div><strong>{appearances}</strong><span>Einsätze</span></div><div><strong>{goals}</strong><span>Tore</span></div><div><strong>{assists}</strong><span>Assists</span></div><div><strong>{participation === null ? "—" : `${participation}%`}</strong><span>Training</span></div></div><DiagnosticOverview latest={history[0]} /></button><button className="card-edit" onClick={onDetails}>Details ansehen</button></div></div></article>;
+function PlayerCard({ profile, flipped, appearances, goals, assists, participation, history, bestDisciplineKeys, onFlip, onEdit, onDetails }: { profile: Profile; flipped: boolean; appearances: number; goals: number; assists: number; participation: number | null; history: Diagnostic[]; bestDisciplineKeys: Set<DiagnosticDisciplineKey>; onFlip: () => void; onEdit: () => void; onDetails: () => void }) {
+  return <article className={`fc-card${flipped ? " flipped" : ""}`}><div className="fc-card-inner"><div className="fc-face fc-front"><button className="card-flip-area" onClick={onFlip} aria-label={`${profile.firstName}: Leistungsseite anzeigen`}><div className="shirt-number">{profile.shirtNumber || "—"}</div><Image src={`/api/player-image?name=${encodeURIComponent(profile.firstName)}`} alt={profile.firstName} width={260} height={260} unoptimized /><div className="fc-name">{profile.firstName}</div><div className="fc-positions"><strong>{profile.primaryPosition || "POS"}</strong><span>{profile.secondaryPosition || "—"}</span></div><div className="fc-foot">Starker Fuß <strong>{{ left: "Links", right: "Rechts", both: "Beide", "": "—" }[profile.strongFoot]}</strong></div><p>{profile.personality || "Spielerpersönlichkeit noch nicht ergänzt."}</p></button><button className="card-edit" onClick={onEdit}>Profil bearbeiten</button></div><div className="fc-face fc-back"><button className="card-flip-area" onClick={onFlip} aria-label={`${profile.firstName}: Profilseite anzeigen`}><p className="section-index">SAISONWERTE</p><h3>{profile.firstName}</h3><div className="fc-metrics"><div><strong>{appearances}</strong><span>Einsätze</span></div><div><strong>{goals}</strong><span>Tore</span></div><div><strong>{assists}</strong><span>Assists</span></div><div><strong>{participation === null ? "—" : `${participation}%`}</strong><span>Training</span></div></div><DiagnosticOverview latest={history[0]} bestDisciplineKeys={bestDisciplineKeys} /></button><button className="card-edit" onClick={onDetails}>Details ansehen</button></div></div></article>;
 }
 
-type DiagnosticStatus = "good" | "mid-good" | "average" | "below" | "bad" | "neutral";
+type DiagnosticStatus = "good" | "mid-good" | "average" | "below" | "critical" | "bad" | "neutral";
 
 function diagnosticStatus(metric?: DiagnosticMetric | null): DiagnosticStatus {
   const rating = `${metric?.rating ?? ""} ${metric?.category ?? ""}`.toLowerCase();
   if (/sehr gut|excellent|top/.test(rating)) return "good";
   if (/\bgut\b/.test(rating)) return "mid-good";
-  if (/durchschnitt|mittel/.test(rating)) return "average";
+  if (/befriedigend/.test(rating)) return "below";
+  if (/ausreichend/.test(rating)) return "critical";
+  if (/mangelhaft/.test(rating)) return "bad";
   if (/unterdurchschnitt|schwach/.test(rating)) return "below";
+  if (/durchschnitt|mittel/.test(rating)) return "average";
   if (/schlecht|ungenügend/.test(rating)) return "bad";
   return "neutral";
 }
 
-function DiagnosticOverview({ latest }: { latest?: Diagnostic }) {
+function DiagnosticOverview({ latest, bestDisciplineKeys }: { latest?: Diagnostic; bestDisciplineKeys: Set<DiagnosticDisciplineKey> }) {
   const rows = latest?.metrics ? [
-    ["10 m Sprint", latest.metrics.sprint10],
-    ["20 m Sprint", latest.metrics.sprint20],
-    ["Laufgewandtheit", latest.metrics.agility],
-    ["Dribbling", latest.metrics.dribbling],
-    ["Shuttle Run", { rating: latest.metrics.shuttleRun.rating, category: null } as DiagnosticMetric],
-    ["Standweitsprung", { rating: latest.metrics.jump.rating, category: null } as DiagnosticMetric],
-  ] as Array<[string, DiagnosticMetric]> : latest ? [
-    ["5 m Sprint", null], ["10 m Sprint", null], ["20 m Sprint", null], ["Agility", null], ["Ausdauer", null], ["Sprungkraft", null],
-  ] as Array<[string, DiagnosticMetric | null]> : [];
-  return <div className="diagnostic-overview"><strong>Leistungsdiagnostik{latest?.ageGroup ? ` · ${latest.ageGroup}` : ""}</strong>{rows.length ? rows.map(([label, metric]) => <div key={label}><span className={`diagnostic-dot ${diagnosticStatus(metric)}`} aria-label={`${label}: ${diagnosticStatus(metric)}`} /><span>{label}</span></div>) : <p>Noch keine Messung erfasst.</p>}</div>;
+    ["sprint10", "10 m Sprint", latest.metrics.sprint10], ["sprint20", "20 m Sprint", latest.metrics.sprint20],
+    ["agility", "Laufgewandtheit", latest.metrics.agility], ["dribbling", "Dribbling", latest.metrics.dribbling],
+    ["shuttleRun", "Shuttle Run", { rating: latest.metrics.shuttleRun.rating, category: null } as DiagnosticMetric],
+    ["jump", "Standweitsprung", { rating: latest.metrics.jump.rating, category: null } as DiagnosticMetric],
+  ] as Array<[string, string, DiagnosticMetric]> : latest ? [
+    ["sprint10", "10 m Sprint", null], ["sprint20", "20 m Sprint", null], ["agility", "Agility", null], ["shuttleRun", "Ausdauer", null], ["jump", "Sprungkraft", null],
+  ] as Array<[string, string, DiagnosticMetric | null]> : [];
+  return <div className="diagnostic-overview"><strong>Leistungsdiagnostik{latest?.ageGroup ? ` · ${latest.ageGroup}` : ""}</strong>{rows.length ? rows.map(([key, label, metric]) => <div key={key}><span className={`diagnostic-dot ${diagnosticStatus(metric)}`} aria-label={`${label}: ${diagnosticStatus(metric)}`} /><span>{label}{bestDisciplineKeys.has(key as DiagnosticDisciplineKey) && <span className="diagnostic-crown" title="Bester Wert im Team" aria-label="Bester Wert im Team"> 👑</span>}</span></div>) : <p>Noch keine Messung erfasst.</p>}</div>;
 }
 
 function DiagnosticMetricRow({ label, metric, unit, previous }: { label: string; metric: DiagnosticMetric; unit: string; previous: number | null }) {
@@ -633,9 +657,12 @@ function DiagnosticMetricRow({ label, metric, unit, previous }: { label: string;
 }
 
 function DiagnosticDetailsDialog({ profile, history, onClose, onEdit }: { profile: Profile; history: Diagnostic[]; onClose: () => void; onEdit: () => void }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  useEffect(() => { const dialog = dialogRef.current; dialog?.showModal(); return () => dialog?.close(); }, []);
-  return <dialog ref={dialogRef} className="modal-backdrop" aria-labelledby="diagnostic-details-title" onCancel={(event) => { event.preventDefault(); onClose(); }} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><form className="coach-modal diagnostic-details-dialog"><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">LEISTUNGSDIAGNOSTIK</p><h2 id="diagnostic-details-title">{profile.firstName}</h2>{history.length ? <div className="diagnostic-detail-list">{history.map((diagnostic, index) => <DiagnosticDetailRecord key={diagnostic.id} diagnostic={diagnostic} previous={history[index + 1]} />)}</div> : <p className="history-empty">Noch keine Leistungsdiagnostik erfasst.</p>}<div className="modal-actions"><button className="text-button" type="button" onClick={onClose}>Schließen</button><button className="primary-button" type="button" onClick={onEdit}>Diagnostik erfassen</button></div></form></dialog>;
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="diagnostic-details-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="coach-modal diagnostic-details-dialog"><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">LEISTUNGSDIAGNOSTIK</p><h2 id="diagnostic-details-title">{profile.firstName}</h2>{history.length ? <div className="diagnostic-detail-list">{history.map((diagnostic, index) => <DiagnosticDetailRecord key={diagnostic.id} diagnostic={diagnostic} previous={history[index + 1]} />)}</div> : <p className="history-empty">Noch keine Leistungsdiagnostik erfasst.</p>}<div className="modal-actions"><button className="text-button" type="button" onClick={onClose}>Schließen</button><button className="primary-button" type="button" onClick={onEdit}>Diagnostik erfassen</button></div></section></div>;
 }
 
 function DiagnosticDetailRecord({ diagnostic, previous }: { diagnostic: Diagnostic; previous?: Diagnostic }) {
