@@ -498,9 +498,9 @@ export default function CoachingTool() {
           <span><small>TSG TÜBINGEN · D1</small><strong>Coaching Tool</strong></span>
         </button>
         <nav aria-label="Hauptnavigation">
-          {(["overview", "calendar", "lineup", "matchday", "tactics", "players", "stats"] as Tab[]).map((item) => (
+          {(["overview", "matchday", "lineup", "tactics", "players", "stats", "calendar"] as Tab[]).map((item) => (
             <button key={item} type="button" className={tab === item ? "active" : ""} onClick={() => setTab(item)}>
-              {{ overview: "Übersicht", calendar: "Kalender", lineup: "Aufstellung", matchday: "Spieltag", tactics: "Taktiken", players: "Team", stats: "Statistik" }[item]}
+              {{ overview: "Übersicht", calendar: "Kalender", lineup: "Aufstellung", matchday: "Spieltag", tactics: "Taktiken", players: "Team", stats: "Statistiken" }[item]}
             </button>
           ))}
         </nav>
