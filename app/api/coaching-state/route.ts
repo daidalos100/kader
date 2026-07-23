@@ -4,6 +4,8 @@ import { isAuthenticated } from "../../auth";
 import { getSupabaseConfig, supabaseHeaders } from "../../lib/supabase";
 
 const SEASON_ID = "d1-2026-27";
+const attendanceStatuses = new Set(["present", "excused", "absent", "not_selected"]);
+const absenceReasons = new Set(["Krankheit", "Verletzung", "Privat", "Schul-Event"]);
 const allowedScopes = new Set(["roster", "profile", "attendance", "match_meta", "match_entry", "diagnostic", "tactic", "calendar_event"]);
 
 type RecordRow = {
@@ -29,7 +31,7 @@ function privateJson(value: unknown, init: ResponseInit = {}) {
 }
 
 function emptyState() {
-  return { roster: [] as string[], profiles: {}, attendance: {}, matches: {}, diagnostics: {}, tactics: {}, calendarOverrides: {} };
+  return { roster: [] as string[], profiles: {}, attendance: {}, attendanceReasons: {}, matches: {}, diagnostics: {}, tactics: {}, calendarOverrides: {} };
 }
 
 function splitCompositeKey(value: string) {
@@ -42,6 +44,7 @@ function assembleState(rows: RecordRow[]) {
     roster: string[];
     profiles: Record<string, unknown>;
     attendance: Record<string, Record<string, unknown>>;
+    attendanceReasons: Record<string, Record<string, unknown>>;
     matches: Record<string, { result: string; entries: Record<string, unknown>; goalEvents: unknown[] }>;
     diagnostics: Record<string, unknown[]>;
     tactics: Record<string, unknown>;
@@ -55,9 +58,15 @@ function assembleState(rows: RecordRow[]) {
     if (row.scope === "profile" && row.data && typeof row.data === "object") state.profiles[row.record_key] = row.data;
     if (row.scope === "attendance") {
       const [eventId, playerId] = splitCompositeKey(row.record_key);
-      if (eventId && playerId && ["present", "excused", "absent", "not_selected"].includes(String(row.data))) {
+      const record = typeof row.data === "string" ? { status: row.data } : isRecord(row.data) ? row.data : null;
+      const status = record?.status;
+      if (eventId && playerId && attendanceStatuses.has(String(status))) {
         state.attendance[eventId] ??= {};
-        state.attendance[eventId][playerId] = row.data;
+        state.attendance[eventId][playerId] = status;
+        if (record?.reason && absenceReasons.has(String(record.reason))) {
+          state.attendanceReasons[eventId] ??= {};
+          state.attendanceReasons[eventId][playerId] = record.reason;
+        }
       }
     }
     if (row.scope === "match_meta" && row.data && typeof row.data === "object") {
@@ -113,7 +122,11 @@ function validOperation(value: unknown): value is Operation {
   if (typeof serialized !== "string" || serialized.length > 25_000) return false;
 
   if (value.scope === "roster") return typeof value.value === "string" && value.value.trim().length > 0 && value.value.length <= 30;
-  if (value.scope === "attendance") return ["present", "excused", "absent", "not_selected"].includes(String(value.value));
+  if (value.scope === "attendance") {
+    if (attendanceStatuses.has(String(value.value))) return true;
+    if (!isRecord(value.value) || !attendanceStatuses.has(String(value.value.status))) return false;
+    return value.value.reason === undefined || (value.value.status === "excused" && absenceReasons.has(String(value.value.reason)));
+  }
   if (value.scope === "match_meta") {
     if (!isRecord(value.value) || typeof value.value.result !== "string" || value.value.result.length > 20) return false;
     const goalEvents = value.value.goalEvents;
