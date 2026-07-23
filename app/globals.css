@@ -541,7 +541,16 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .tactics-scenarios button { flex: 0 0 auto; min-height: 44px; padding: 0 18px; border: 1px solid rgba(244,243,239,.18); background: #101115; color: #8f9197; font-size: .64rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
 .tactics-scenarios button:hover { border-color: rgba(239,22,28,.7); color: var(--white); }
 .tactics-scenarios button.active { border-color: var(--red); background: var(--red); color: var(--white); }
+.tactics-scenarios button.custom { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.tactics-scenarios button.tactics-add { border-style: dashed; color: #c7c8cc; }
+.tactics-scenarios button.tactics-add:hover { border-color: var(--red); background: rgba(239,22,28,.12); }
 .tactics-scenarios .saving { flex: 0 0 auto; margin-left: auto; padding-inline: 10px; }
+.tactics-actions .danger { color: #ff8c8c; }
+.tactics-dialog { width: min(420px, calc(100vw - 28px)); }
+.tactics-dialog form { display: grid; gap: 12px; }
+.tactics-dialog label { display: grid; gap: 7px; color: #a3a5aa; font-size: .64rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.tactics-dialog input, .tactics-dialog select { min-height: 46px; padding: 0 12px; border: 1px solid rgba(244,243,239,.22); background: #101115; color: var(--white); font: inherit; }
+.tactics-dialog .modal-actions { display: flex; justify-content: flex-end; gap: 14px; margin-top: 8px; }
 .tactics-pitch { min-height: 680px; }
 .tactic-position { touch-action: none; cursor: grab; user-select: none; }
 .tactic-position.dragging { z-index: 9; cursor: grabbing; }
@@ -636,6 +645,8 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
   .tactics-actions { width: 100%; justify-content: space-between; }
   .tactics-scenarios { margin-inline: -12px; padding-inline: 12px; }
   .tactics-scenarios .saving { margin-left: 4px; }
+  .tactics-scenarios { flex-wrap: wrap; overflow-x: visible; }
+  .tactics-scenarios .tactics-add { width: 100%; }
   .tactics-pitch { min-height: 760px; }
   .tactics-pitch .position-node { width: 84px; }
   .tactics-pitch .position-player { justify-content: center; }
@@ -645,3 +656,4 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
   .tactics-workspace.presenting .tactics-scenarios { margin-inline: -8px; padding-inline: 8px; }
   .tactics-workspace.presenting .tactics-pitch { height: calc(100dvh - 120px); min-height: 720px; }
 }
+
