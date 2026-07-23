@@ -594,6 +594,8 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
 .stats-sort-button:hover, .stats-sort-button:focus-visible, .stats-sort-button.active { color: var(--white); outline: none; }
 .stats-sort-button.active span { color: var(--red); }
 .stat-value { display: inline-flex; align-items: center; gap: 7px; color: var(--white); font-weight: 800; font-variant-numeric: tabular-nums; }
+.stats-value-button { padding: 5px 2px; border: 0; background: transparent; font: inherit; cursor: pointer; }
+.stats-value-button:hover, .stats-value-button:focus-visible { color: var(--red); outline: none; }
 .stat-value i { width: 8px; height: 8px; border-radius: 50%; background: #62646b; box-shadow: 0 0 0 5px rgba(98,100,107,.14); }
 .stat-value.stat-good { color: #7edb86; }
 .stat-value.stat-good i { background: #55b95d; box-shadow: 0 0 0 5px rgba(85,185,93,.15); }
@@ -620,6 +622,14 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
 .modal-backdrop::backdrop { background: rgba(2,3,5,.82); }
 .coach-modal { position: relative; width: min(680px, 100%); padding: clamp(26px, 5vw, 46px); border: 1px solid rgba(244,243,239,.34); background: #101115; color: var(--white); box-shadow: 0 30px 100px #000; }
 .coach-modal h2 { margin: 9px 0 28px; color: var(--white); font-size: clamp(2.2rem, 6vw, 4rem); line-height: .9; text-transform: uppercase; }
+.stat-details-dialog { width: min(620px, 100%); }
+.stat-details-value { display: block; margin: -8px 0 24px; color: var(--red); font-size: clamp(2.2rem, 8vw, 4rem); font-variant-numeric: tabular-nums; }
+.stat-details-dialog ul { display: grid; gap: 0; max-height: min(52vh, 470px); overflow-y: auto; margin: 0; padding: 0; list-style: none; border-top: 1px solid rgba(244,243,239,.14); }
+.stat-details-dialog li { display: grid; grid-template-columns: 116px 1fr; gap: 14px; padding: 14px 0; border-bottom: 1px solid rgba(244,243,239,.1); }
+.stat-details-dialog time { color: #91939a; font-size: .68rem; font-variant-numeric: tabular-nums; }
+.stat-details-dialog li div { display: grid; gap: 4px; }
+.stat-details-dialog li strong { color: var(--white); font-size: .85rem; }
+.stat-details-dialog li span { color: #b7b8bd; font-size: .76rem; }
 .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
 .form-grid .wide { grid-column: 1 / -1; }
 .coach-modal textarea { resize: vertical; }
