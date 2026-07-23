@@ -84,7 +84,7 @@ test("appearances are derived from saved matchday lineups", async () => {
   const [component, route] = await Promise.all([
     source("app/components/CoachingTool.tsx"), source("app/api/lineup/route.ts"),
   ]);
-  for (const marker of ["eventLineups", "appearanceCounts", "eligibleEventLineupIds", "match-statistic-note"]) {
+  for (const marker of ["eventLineups", "appearanceCounts", "eligibleEventLineupIds", "entry.firstName", "match-statistic-note"]) {
     assert.ok(component.includes(marker), `missing ${marker}`);
   }
   assert.ok(route.includes('params.get("eventLineups")'));
