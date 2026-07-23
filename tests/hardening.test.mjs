@@ -13,7 +13,7 @@ test("mobile and accessibility safeguards stay present", async () => {
   ]);
   for (const marker of [
     "@media (max-width: 820px)", "@media (max-width: 560px)", "@media (max-width: 380px)",
-    "prefers-reduced-motion", "focus-visible", "safe-area-inset-left", "pointer: coarse",
+    "prefers-reduced-motion", "focus-visible", "safe-area-inset-left", "pointer: coarse", "overscroll-behavior-x: contain", "min-height: 44px",
   ]) assert.match(css, new RegExp(marker.replace(/[()]/g, "\\$&")));
   for (const marker of ["aria-live=\"polite\"", "<dialog", "aria-labelledby", "role=\"status\""]) {
     assert.ok(component.includes(marker), `missing ${marker}`);
