@@ -531,6 +531,31 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .history-list button:disabled { opacity: .45; cursor: wait; }
 .history-empty { margin: 0; padding: 22px; border: 1px solid rgba(244,243,239,.14); background: #101115; }
 
+/* Taktiktafel */
+.tactics-workspace { position: relative; }
+.tactics-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 16px; }
+.tactics-toolbar > div:first-child { display: grid; gap: 5px; }
+.tactics-toolbar strong { font-size: .86rem; }
+.tactics-actions { display: flex; align-items: center; gap: 18px; }
+.tactics-scenarios { display: flex; align-items: center; gap: 7px; margin-bottom: 14px; overflow-x: auto; }
+.tactics-scenarios button { flex: 0 0 auto; min-height: 44px; padding: 0 18px; border: 1px solid rgba(244,243,239,.18); background: #101115; color: #8f9197; font-size: .64rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.tactics-scenarios button:hover { border-color: rgba(239,22,28,.7); color: var(--white); }
+.tactics-scenarios button.active { border-color: var(--red); background: var(--red); color: var(--white); }
+.tactics-scenarios .saving { flex: 0 0 auto; margin-left: auto; padding-inline: 10px; }
+.tactics-pitch { min-height: 680px; }
+.tactic-position { touch-action: none; cursor: grab; user-select: none; }
+.tactic-position.dragging { z-index: 9; cursor: grabbing; }
+.tactic-position.dragging .position-badge { transform: scale(1.1); box-shadow: 0 16px 44px rgba(0,0,0,.55); }
+.tactics-ball { position: absolute; z-index: 7; display: grid; width: 48px; height: 48px; place-items: center; padding: 0; border: 2px solid rgba(244,243,239,.9); border-radius: 50%; background: #f4f3ef; box-shadow: 0 8px 24px rgba(0,0,0,.5); font-size: 1.75rem; line-height: 1; transform: translate(-50%, -50%); touch-action: none; cursor: grab; user-select: none; }
+.tactics-ball.dragging { z-index: 10; cursor: grabbing; transform: translate(-50%, -50%) scale(1.1); }
+.tactics-help { margin: 12px 0 0; color: #7f8187; font-size: .68rem; line-height: 1.5; }
+.tactics-workspace.presenting { position: fixed; z-index: 100; inset: 0; overflow: auto; padding: 18px clamp(16px, 3vw, 44px) 24px; background: var(--black); }
+.tactics-workspace.presenting .tactics-toolbar { justify-content: flex-end; margin-bottom: 10px; }
+.tactics-workspace.presenting .tactics-toolbar > div:first-child,
+.tactics-workspace.presenting .tactics-actions .text-button,
+.tactics-workspace.presenting .tactics-help { display: none; }
+.tactics-workspace.presenting .tactics-pitch { width: min(1120px, 100%); min-height: 0; height: calc(100dvh - 142px); margin-inline: auto; aspect-ratio: auto; }
+
 :where(button, a, input, select, textarea):focus-visible { outline: 3px solid #ffeb67; outline-offset: 3px; }
 @media (pointer: coarse) {
   :where(.coach-header nav button, .text-button, .logout-button, .history-list button, .history-toggle) { min-height: 44px; }
@@ -567,6 +592,8 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
   .position-filters { width: 100%; }
   .fc-card, .fc-card-inner { min-height: 550px; }
   .setup-banner { align-items: flex-start; flex-direction: column; }
+  .tactics-pitch { min-height: 740px; }
+  .tactics-workspace.presenting .tactics-pitch { height: calc(100dvh - 132px); min-height: 680px; }
 }
 
 @media (max-width: 560px) {
@@ -605,4 +632,16 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
   .history-toggle { width: 100%; }
   .history-list li { align-items: flex-start; }
   .history-list button { flex: 0 0 auto; }
+  .tactics-toolbar { align-items: flex-start; flex-direction: column; }
+  .tactics-actions { width: 100%; justify-content: space-between; }
+  .tactics-scenarios { margin-inline: -12px; padding-inline: 12px; }
+  .tactics-scenarios .saving { margin-left: 4px; }
+  .tactics-pitch { min-height: 760px; }
+  .tactics-pitch .position-node { width: 84px; }
+  .tactics-pitch .position-player { justify-content: center; }
+  .tactics-ball { width: 44px; height: 44px; font-size: 1.55rem; }
+  .tactics-workspace.presenting { padding: 10px 8px 14px; }
+  .tactics-workspace.presenting .tactics-actions { justify-content: flex-end; }
+  .tactics-workspace.presenting .tactics-scenarios { margin-inline: -8px; padding-inline: 8px; }
+  .tactics-workspace.presenting .tactics-pitch { height: calc(100dvh - 120px); min-height: 720px; }
 }

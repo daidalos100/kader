@@ -4,7 +4,7 @@ import { isAuthenticated } from "../../auth";
 import { getSupabaseConfig, supabaseHeaders } from "../../lib/supabase";
 
 const SEASON_ID = "d1-2026-27";
-const allowedScopes = new Set(["roster", "profile", "attendance", "match_meta", "match_entry", "diagnostic"]);
+const allowedScopes = new Set(["roster", "profile", "attendance", "match_meta", "match_entry", "diagnostic", "tactic"]);
 
 type RecordRow = {
   scope: string;
@@ -29,7 +29,7 @@ function privateJson(value: unknown, init: ResponseInit = {}) {
 }
 
 function emptyState() {
-  return { roster: [] as string[], profiles: {}, attendance: {}, matches: {}, diagnostics: {} };
+  return { roster: [] as string[], profiles: {}, attendance: {}, matches: {}, diagnostics: {}, tactics: {} };
 }
 
 function splitCompositeKey(value: string) {
@@ -44,6 +44,7 @@ function assembleState(rows: RecordRow[]) {
     attendance: Record<string, Record<string, unknown>>;
     matches: Record<string, { result: string; entries: Record<string, unknown> }>;
     diagnostics: Record<string, unknown[]>;
+    tactics: Record<string, unknown>;
   };
   const revisions: Record<string, number> = {};
 
@@ -73,6 +74,9 @@ function assembleState(rows: RecordRow[]) {
     if (row.scope === "diagnostic" && row.data && typeof row.data === "object") {
       const [playerId] = splitCompositeKey(row.record_key);
       if (playerId) (state.diagnostics[playerId] ??= []).push(row.data);
+    }
+    if (row.scope === "tactic" && row.data && typeof row.data === "object") {
+      state.tactics[row.record_key] = row.data;
     }
   }
 
@@ -121,6 +125,15 @@ function validOperation(value: unknown): value is Operation {
       const item = diagnostic[field];
       return item === null || (typeof item === "number" && Number.isFinite(item) && item >= 0 && item <= 10_000);
     });
+  }
+  if (value.scope === "tactic") {
+    if (!["attack", "defense", "corner"].includes(value.key) || !isRecord(value.value)) return false;
+    if (!isRecord(value.value.positions) || !isRecord(value.value.ball)) return false;
+    const validPoint = (point: unknown) => isRecord(point) &&
+      typeof point.x === "number" && Number.isFinite(point.x) && point.x >= 0 && point.x <= 100 &&
+      typeof point.y === "number" && Number.isFinite(point.y) && point.y >= 0 && point.y <= 100;
+    return ["st", "lf", "rf", "zm", "zdm", "lv", "iv", "rv", "tw"].every((id) => validPoint(value.value.positions[id])) &&
+      validPoint(value.value.ball);
   }
   return false;
 }
@@ -195,6 +208,9 @@ export async function PATCH(request: Request) {
         }
         if (response.status === 404 || detail.includes("apply_coaching_record")) {
           return privateJson({ error: "Die Sicherheitsmigration Phase 3 fehlt noch.", migrationRequired: true }, { status: 409 });
+        }
+        if (detail.includes("invalid_scope") || detail.includes("coaching_records_scope_check")) {
+          return privateJson({ error: "Die Supabase-Erweiterung für Taktiken fehlt noch.", migrationRequired: true }, { status: 409 });
         }
         throw new Error(`Supabase ${response.status}: ${detail.slice(0, 160)}`);
       }

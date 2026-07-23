@@ -3,7 +3,7 @@
 
 create table if not exists public.coaching_records (
   season_id text not null,
-  scope text not null check (scope in ('roster', 'profile', 'attendance', 'match_meta', 'match_entry', 'diagnostic')),
+  scope text not null check (scope in ('roster', 'profile', 'attendance', 'match_meta', 'match_entry', 'diagnostic', 'tactic')),
   record_key text not null,
   data jsonb not null,
   revision bigint not null default 1 check (revision > 0),
@@ -180,7 +180,7 @@ as $$
 declare
   current_revision bigint;
 begin
-  if p_scope not in ('roster', 'profile', 'attendance', 'match_meta', 'match_entry', 'diagnostic') then
+  if p_scope not in ('roster', 'profile', 'attendance', 'match_meta', 'match_entry', 'diagnostic', 'tactic') then
     raise exception 'invalid_scope' using errcode = '22023';
   end if;
 

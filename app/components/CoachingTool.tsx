@@ -3,9 +3,10 @@
 import Image from "next/image";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import SquadPlanner from "./SquadPlanner";
+import TacticsBoard, { TacticLayout } from "./TacticsBoard";
 import type { CalendarEvent } from "../lib/calendar";
 
-type Tab = "overview" | "calendar" | "lineup" | "players" | "stats";
+type Tab = "overview" | "calendar" | "lineup" | "tactics" | "players" | "stats";
 type AttendanceStatus = "present" | "excused" | "absent";
 type Profile = {
   id: string;
@@ -34,12 +35,13 @@ type CoachingState = {
   attendance: Record<string, Record<string, AttendanceStatus>>;
   matches: Record<string, MatchData>;
   diagnostics: Record<string, Diagnostic[]>;
+  tactics: Record<string, TacticLayout>;
 };
 type SaveOperation = { scope: string; key: string; value: unknown; expectedRevision: number };
 type HistoryEntry = { id: number; scope: string; record_key: string; revision: number; changed_at: string; changed_by: string };
 
 const positionOptions = ["TW", "IV", "LV", "RV", "ZDM", "ZM", "LF", "RF", "ST"];
-const emptyState: CoachingState = { roster: [], profiles: {}, attendance: {}, matches: {}, diagnostics: {} };
+const emptyState: CoachingState = { roster: [], profiles: {}, attendance: {}, matches: {}, diagnostics: {}, tactics: {} };
 
 function playerId(name: string) {
   return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "-");
@@ -58,7 +60,7 @@ function normalizeState(value: unknown, fallbackRoster: string[] = []): Coaching
   return {
     roster: Array.isArray(state.roster) && state.roster.length ? state.roster : fallbackRoster,
     profiles: state.profiles ?? {}, attendance: state.attendance ?? {}, matches: state.matches ?? {},
-    diagnostics: state.diagnostics ?? {},
+    diagnostics: state.diagnostics ?? {}, tactics: state.tactics ?? {},
   };
 }
 
@@ -171,8 +173,10 @@ export default function CoachingTool() {
       }
       setRevisions((current) => ({ ...current, ...(data.revisions ?? {}) }));
       setMigrationRequired(false);
+      return true;
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Speichern fehlgeschlagen.");
+      return false;
     } finally {
       setPendingSaves((count) => Math.max(0, count - 1));
     }
@@ -270,6 +274,12 @@ export default function CoachingTool() {
     window.location.assign("/login");
   }
 
+  async function saveTactic(scenario: "attack" | "defense" | "corner", layout: TacticLayout) {
+    const next = { ...state, tactics: { ...state.tactics, [scenario]: layout } };
+    const saved = await save(next, [operation("tactic", scenario, layout)]);
+    if (!saved) throw new Error("Taktik konnte nicht gespeichert werden.");
+  }
+
   const statsRows = profiles.map((player) => {
     let appearances = 0; let goals = 0; let assists = 0; let present = 0; let recorded = 0;
     Object.values(state.matches).forEach((match) => {
@@ -304,9 +314,9 @@ export default function CoachingTool() {
           <span><small>TSG TÜBINGEN · D1</small><strong>Coaching Tool</strong></span>
         </button>
         <nav aria-label="Hauptnavigation">
-          {(["overview", "calendar", "lineup", "players", "stats"] as Tab[]).map((item) => (
+          {(["overview", "calendar", "lineup", "tactics", "players", "stats"] as Tab[]).map((item) => (
             <button key={item} type="button" className={tab === item ? "active" : ""} onClick={() => setTab(item)}>
-              {{ overview: "Übersicht", calendar: "Kalender", lineup: "Aufstellung", players: "Team", stats: "Statistik" }[item]}
+              {{ overview: "Übersicht", calendar: "Kalender", lineup: "Aufstellung", tactics: "Taktiken", players: "Team", stats: "Statistik" }[item]}
             </button>
           ))}
         </nav>
@@ -318,8 +328,8 @@ export default function CoachingTool() {
 
       {migrationRequired && (
         <aside className="setup-banner">
-          <strong>Sicherheitsmigration Phase 3 fehlt.</strong>
-          <span>Bitte <code>supabase/phase3-hardening.sql</code> einmal im Supabase SQL Editor ausführen. Bestehende Daten bleiben erhalten.</span>
+          <strong>Einmalige Datenbankfreigabe fehlt.</strong>
+          <span>Bitte die aktuelle SQL-Migration einmal im Supabase SQL Editor ausführen. Bestehende Daten bleiben erhalten.</span>
         </aside>
       )}
       {notice && <p className="coach-notice" role="status">{notice}</p>}
@@ -378,6 +388,20 @@ export default function CoachingTool() {
             </section>
           )}
 
+          {tab === "tactics" && (
+            <section className="coach-view tactics-view">
+              <div className="view-heading compact">
+                <div><p className="section-index">SPIELPRINZIPIEN</p><h1>Taktiken.</h1><p>Angriff, Verteidigung und Ecke mit dem aktuellen Spieltagskader visualisieren und präsentieren.</p></div>
+              </div>
+              <TacticsBoard
+                lineupId={nextGame ? eventLineupId(nextGame) : "default"}
+                eventTitle={nextGame ? `${nextGame.title} · ${formatDate(nextGame.start, false)}` : "Allgemeine Aufstellung"}
+                tactics={state.tactics}
+                onSave={saveTactic}
+              />
+            </section>
+          )}
+
           {tab === "players" && (
             <section className="coach-view">
               <div className="view-heading compact team-heading"><div><p className="section-index">SPIELERPROFILE</p><h1>Teamkarten.</h1><p>Karte anklicken, um zwischen Profil und Leistungsseite zu wechseln.</p></div><form className="roster-form" onSubmit={addRosterPlayer}><label htmlFor="roster-name">Spieler:in ergänzen</label><div><input id="roster-name" value={newRosterName} onChange={(event) => setNewRosterName(event.target.value)} placeholder="Vorname" maxLength={30} /><button type="submit" disabled={!newRosterName.trim()}>Hinzufügen</button></div></form></div>
@@ -424,7 +448,7 @@ export default function CoachingTool() {
 function historyLabel(entry: HistoryEntry) {
   const labels: Record<string, string> = {
     roster: "Teamliste", profile: "Spielerprofil", attendance: "Trainingsteilnahme",
-    match_meta: "Spielergebnis", match_entry: "Spielstatistik", diagnostic: "Leistungsdiagnostik",
+    match_meta: "Spielergebnis", match_entry: "Spielstatistik", diagnostic: "Leistungsdiagnostik", tactic: "Taktik",
   };
   const subject = entry.scope === "profile" || entry.scope === "roster" || entry.scope === "diagnostic"
     ? entry.record_key.split(":")[0].replace(/-/g, " ")
