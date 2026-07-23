@@ -128,20 +128,12 @@ function eventLineupId(event: CalendarEvent) {
   return `event-${event.id.replace(/[^a-zA-Z0-9._:-]/g, "_").slice(0, 210)}`;
 }
 
-function numberValue(value: FormDataEntryValue | null) {
-  const normalized = String(value ?? "").trim().replace(",", ".");
-  if (!normalized) return null;
-  const result = Number(normalized);
-  return Number.isFinite(result) ? result : null;
-}
-
 export default function CoachingTool() {
   const [tab, setTab] = useState<Tab>("overview");
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [state, setState] = useState<CoachingState>(emptyState);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
-  const [diagnosticPlayer, setDiagnosticPlayer] = useState<Profile | null>(null);
   const [detailPlayer, setDetailPlayer] = useState<Profile | null>(null);
   const [flipped, setFlipped] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -396,24 +388,6 @@ export default function CoachingTool() {
     const operations = [operation("match_meta", eventId, { result: next.result, goalEvents: next.goalEvents }), operation("match_entry", `${eventId}:${goal.scorerId}`, entries[goal.scorerId])];
     if (goal.assistId && entries[goal.assistId]) operations.push(operation("match_entry", `${eventId}:${goal.assistId}`, entries[goal.assistId]));
     return save({ ...state, matches: { ...state.matches, [eventId]: next } }, operations);
-  }
-
-  function addDiagnostic(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!diagnosticPlayer) return;
-    const form = new FormData(event.currentTarget);
-    const diagnostic: Diagnostic = {
-      id: crypto.randomUUID(), date: String(form.get("date") || new Date().toISOString().slice(0, 10)),
-      sprint5: numberValue(form.get("sprint5")), sprint10: numberValue(form.get("sprint10")),
-      sprint20: numberValue(form.get("sprint20")), agility: numberValue(form.get("agility")),
-      endurance: numberValue(form.get("endurance")), jump: numberValue(form.get("jump")),
-    };
-    const history = [...(state.diagnostics[diagnosticPlayer.id] ?? []), diagnostic].sort((a, b) => b.date.localeCompare(a.date));
-    setDiagnosticPlayer(null);
-    void save(
-      { ...state, diagnostics: { ...state.diagnostics, [diagnosticPlayer.id]: history } },
-      [operation("diagnostic", `${diagnosticPlayer.id}:${diagnostic.id}`, diagnostic)],
-    );
   }
 
   async function logout() {
@@ -705,8 +679,7 @@ export default function CoachingTool() {
       {editingCalendarEvent && <CalendarEventDialog event={editingCalendarEvent} onClose={() => setEditingCalendarEvent(null)} onSubmit={saveCalendarEvent} />}
 
       {editingProfile && <ProfileDialog profile={editingProfile} onClose={() => setEditingProfile(null)} onSubmit={saveProfile} />}
-      {diagnosticPlayer && <DiagnosticDialog profile={diagnosticPlayer} onClose={() => setDiagnosticPlayer(null)} onSubmit={addDiagnostic} />}
-      {detailPlayer && <DiagnosticDetailsDialog profile={detailPlayer} history={state.diagnostics[detailPlayer.id] ?? []} bestDisciplineKeys={diagnosticBestByPlayer[detailPlayer.id] ?? new Set()} onClose={() => setDetailPlayer(null)} onEdit={() => { setDetailPlayer(null); setDiagnosticPlayer(detailPlayer); }} />}
+      {detailPlayer && <DiagnosticDetailsDialog profile={detailPlayer} history={state.diagnostics[detailPlayer.id] ?? []} bestDisciplineKeys={diagnosticBestByPlayer[detailPlayer.id] ?? new Set()} onClose={() => setDetailPlayer(null)} />}
     </main>
   );
 }
@@ -869,13 +842,13 @@ function DiagnosticMetricRow({ label, metric, unit, previous, lowerIsBetter, bes
   return <div><span className="diagnostic-detail-label"><span className={`diagnostic-dot ${diagnosticStatus(metric)}`} /><strong>{label}{best && <span className="diagnostic-crown" title="Bester Wert im Team">👑</span>}</strong><small>{metric.attempts.length ? `${metric.attempts.map((attempt, index) => `V${index + 1}: ${attempt ?? "—"}`).join(" · ")} · ` : ""}{metric.percentile === null ? "" : `PR ${Math.round(metric.percentile * 100)}% · `}{metric.category ?? ""}</small></span><b>{metric.best ?? "—"}{metric.best !== null && unit ? ` ${unit}` : ""}<small>{metric.rating ?? ""}</small><Trend current={metric.best} previous={previous} lowerIsBetter={lowerIsBetter} unit={unit} /></b></div>;
 }
 
-function DiagnosticDetailsDialog({ profile, history, bestDisciplineKeys, onClose, onEdit }: { profile: Profile; history: Diagnostic[]; bestDisciplineKeys: Set<DiagnosticDisciplineKey>; onClose: () => void; onEdit: () => void }) {
+function DiagnosticDetailsDialog({ profile, history, bestDisciplineKeys, onClose }: { profile: Profile; history: Diagnostic[]; bestDisciplineKeys: Set<DiagnosticDisciplineKey>; onClose: () => void }) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
-  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="diagnostic-details-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="coach-modal diagnostic-details-dialog"><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">LEISTUNGSDIAGNOSTIK</p><h2 id="diagnostic-details-title">{profile.firstName}</h2>{history.length ? <div className="diagnostic-detail-list">{history.map((diagnostic, index) => <DiagnosticDetailRecord key={diagnostic.id} diagnostic={diagnostic} previous={history[index + 1]} bestDisciplineKeys={index === 0 ? bestDisciplineKeys : new Set()} />)}</div> : <p className="history-empty">Noch keine Leistungsdiagnostik erfasst.</p>}<div className="modal-actions"><button className="text-button" type="button" onClick={onClose}>Schließen</button><button className="primary-button" type="button" onClick={onEdit}>Diagnostik erfassen</button></div></section></div>;
+  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="diagnostic-details-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="coach-modal diagnostic-details-dialog"><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">LEISTUNGSDIAGNOSTIK</p><h2 id="diagnostic-details-title">{profile.firstName}</h2>{history.length ? <div className="diagnostic-detail-list">{history.map((diagnostic, index) => <DiagnosticDetailRecord key={diagnostic.id} diagnostic={diagnostic} previous={history[index + 1]} bestDisciplineKeys={index === 0 ? bestDisciplineKeys : new Set()} />)}</div> : <p className="history-empty">Noch keine Leistungsdiagnostik erfasst.</p>}</section></div>;
 }
 
 function DiagnosticDetailRecord({ diagnostic, previous, bestDisciplineKeys }: { diagnostic: Diagnostic; previous?: Diagnostic; bestDisciplineKeys: Set<DiagnosticDisciplineKey> }) {
@@ -956,13 +929,4 @@ function ProfileDialog({ profile, onClose, onSubmit }: { profile: Profile; onClo
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => { const dialog = dialogRef.current; dialog?.showModal(); return () => dialog?.close(); }, []);
   return <dialog ref={dialogRef} className="modal-backdrop" aria-labelledby="profile-dialog-title" onCancel={(e) => { e.preventDefault(); onClose(); }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><form className="coach-modal" onSubmit={onSubmit}><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">SPIELERPROFIL</p><h2 id="profile-dialog-title">{profile.firstName}</h2><div className="form-grid"><label>Trikotnummer<input autoFocus name="shirtNumber" type="number" min="0" max="999" defaultValue={profile.shirtNumber} /></label><label>Hauptposition<select name="primaryPosition" defaultValue={profile.primaryPosition}><option value="">Bitte wählen</option>{positionOptions.map((position) => <option key={position}>{position}</option>)}</select></label><label>Ersatzposition<select name="secondaryPosition" defaultValue={profile.secondaryPosition}><option value="">Keine</option>{positionOptions.map((position) => <option key={position}>{position}</option>)}</select></label><label>Starker Fuß<select name="strongFoot" defaultValue={profile.strongFoot}><option value="">Bitte wählen</option><option value="left">Links</option><option value="right">Rechts</option><option value="both">Beide</option></select></label><label className="wide">Spielerpersönlichkeit<textarea name="personality" defaultValue={profile.personality} rows={4} placeholder="Stärken, Rolle im Team, Coaching-Hinweise …" /></label></div><button className="primary-button" type="submit">Profil speichern</button></form></dialog>;
-}
-
-function DiagnosticDialog({ profile, onClose, onSubmit }: { profile: Profile; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
-  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="diagnostic-dialog-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><form className="coach-modal diagnostic-entry-dialog" onSubmit={onSubmit}><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">NEUE LEISTUNGSDIAGNOSTIK</p><h2 id="diagnostic-dialog-title">{profile.firstName}</h2><p className="diagnostic-entry-intro">Neue Messung ergänzen. Bestehende Diagnostiken bleiben im Verlauf erhalten.</p><div className="form-grid diagnostic-form"><label>Datum<input autoFocus name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></label><span /><label>Sprint 5 m (Sek.)<input name="sprint5" inputMode="decimal" /></label><label>Sprint 10 m (Sek.)<input name="sprint10" inputMode="decimal" /></label><label>Sprint 20 m (Sek.)<input name="sprint20" inputMode="decimal" /></label><label>Agility (Sek.)<input name="agility" inputMode="decimal" /></label><label>Ausdauerwert<input name="endurance" inputMode="decimal" /></label><label>Sprungkraft (cm)<input name="jump" inputMode="decimal" /></label></div><div className="modal-actions"><button className="text-button" type="button" onClick={onClose}>Abbrechen</button><button className="primary-button" type="submit">Messung speichern</button></div></form></div>;
 }
