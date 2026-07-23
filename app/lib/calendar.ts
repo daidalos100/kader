@@ -51,7 +51,8 @@ export async function getCalendarEvents() {
 
   const root = new ICAL.Component(ICAL.parse(await response.text()));
   const components = root.getAllSubcomponents("vevent");
-  const from = Date.now() - 1000 * 60 * 60 * 24 * 45;
+  // Vergangene Termine bleiben für Anwesenheit, Rückblick und Korrekturen verfügbar.
+  const from = Date.now() - 1000 * 60 * 60 * 24 * 365;
   const until = Date.now() + 1000 * 60 * 60 * 24 * 220;
   const results: CalendarEvent[] = [];
 
