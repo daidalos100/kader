@@ -460,11 +460,10 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .diagnostic-overview > div { display: flex; align-items: center; gap: 9px; padding: 7px 0; border-bottom: 1px solid rgba(244,243,239,.08); color: #b4b5b9; font-size: .72rem; }
 .diagnostic-overview > p { margin: 5px 0 0; color: #777a80; font-size: .7rem; }
 .diagnostic-dot { display: block; flex: 0 0 9px; width: 9px; height: 9px; border-radius: 50%; background: #72747b; box-shadow: 0 0 0 3px rgba(114,116,123,.12); }
-.diagnostic-dot.good { background: #55ce75; box-shadow: 0 0 0 3px rgba(85,206,117,.14); }
-.diagnostic-dot.mid-good { background: #a6d95c; box-shadow: 0 0 0 3px rgba(166,217,92,.14); }
-.diagnostic-dot.average { background: #e7c84c; box-shadow: 0 0 0 3px rgba(231,200,76,.14); }
+.diagnostic-dot.good, .diagnostic-dot.mid-good { background: #00b050; box-shadow: 0 0 0 3px rgba(0,176,80,.18); }
+.diagnostic-dot.average { background: #ffff00; box-shadow: 0 0 0 3px rgba(255,255,0,.16); }
 .diagnostic-dot.below { background: #f08245; box-shadow: 0 0 0 3px rgba(240,130,69,.14); }
-.diagnostic-dot.critical { background: #ef161c; box-shadow: 0 0 0 3px rgba(239,22,28,.16); }
+.diagnostic-dot.critical { background: #ff0000; box-shadow: 0 0 0 3px rgba(255,0,0,.16); }
 .diagnostic-dot.bad { background: #7b171c; box-shadow: 0 0 0 3px rgba(123,23,28,.18); }
 .diagnostic-crown { margin-left: 3px; font-size: .8rem; }
 .diagnostic-source { margin-top: 8px; color: #777a80; font-size: .5rem; }
