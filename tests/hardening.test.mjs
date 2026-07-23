@@ -52,7 +52,7 @@ test("sensitive API routes explicitly prevent shared caching", async () => {
   for (const route of routes) assert.match(await source(route), /private, no-store/);
 });
 
-test("tactics stay fixed, draggable and tied to lineups", async () => {
+test("tactics stay draggable, tied to lineups and support custom scenarios", async () => {
   const [board, component, route] = await Promise.all([
     source("app/components/TacticsBoard.tsx"),
     source("app/components/CoachingTool.tsx"),
@@ -60,11 +60,13 @@ test("tactics stay fixed, draggable and tied to lineups", async () => {
   ]);
   for (const marker of [
     'attack: "Angriff"', 'defense: "Verteidigung"', 'corner: "Ecke"',
-    "tactics-ball", "onPointerDown", "onKeyDown", 'fetch("/api/lineup?lineupId=default"',
+    "tactics-ball", "onPointerDown", "onKeyDown", 'fetch("/api/lineup?lineupId=default"', "+ Neue Taktik", "onCreate", "onDuplicate", "onDelete",
   ]) assert.ok(board.includes(marker), `missing ${marker}`);
-  assert.ok(!board.includes("Taktik hinzufügen"));
+  assert.ok(board.includes("Taktik umbenennen"));
   assert.ok(component.includes('"overview", "calendar", "lineup", "tactics", "players", "stats"'));
   assert.ok(component.includes('operation("tactic"'));
   assert.ok(route.includes('"tactic"'));
   assert.ok(route.includes('"attack", "defense", "corner"'));
+  assert.ok(route.includes("custom-[a-z0-9-]"));
 });
+
