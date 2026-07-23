@@ -4,7 +4,7 @@ import { isAuthenticated } from "../../auth";
 import { getSupabaseConfig, supabaseHeaders } from "../../lib/supabase";
 
 const SEASON_ID = "d1-2026-27";
-const allowedScopes = new Set(["roster", "profile", "attendance", "match_meta", "match_entry", "diagnostic", "tactic"]);
+const allowedScopes = new Set(["roster", "profile", "attendance", "match_meta", "match_entry", "diagnostic", "tactic", "calendar_event"]);
 
 type RecordRow = {
   scope: string;
@@ -29,7 +29,7 @@ function privateJson(value: unknown, init: ResponseInit = {}) {
 }
 
 function emptyState() {
-  return { roster: [] as string[], profiles: {}, attendance: {}, matches: {}, diagnostics: {}, tactics: {} };
+  return { roster: [] as string[], profiles: {}, attendance: {}, matches: {}, diagnostics: {}, tactics: {}, calendarOverrides: {} };
 }
 
 function splitCompositeKey(value: string) {
@@ -45,6 +45,7 @@ function assembleState(rows: RecordRow[]) {
     matches: Record<string, { result: string; entries: Record<string, unknown>; goalEvents: unknown[] }>;
     diagnostics: Record<string, unknown[]>;
     tactics: Record<string, unknown>;
+    calendarOverrides: Record<string, unknown>;
   };
   const revisions: Record<string, number> = {};
 
@@ -81,6 +82,7 @@ function assembleState(rows: RecordRow[]) {
       const tactic = row.data as { deleted?: unknown };
       if (tactic.deleted !== true) state.tactics[row.record_key] = row.data;
     }
+    if (row.scope === "calendar_event" && row.data && typeof row.data === "object") state.calendarOverrides[row.record_key] = row.data;
   }
 
   state.roster.sort((a, b) => a.localeCompare(b, "de"));
@@ -144,6 +146,13 @@ function validOperation(value: unknown): value is Operation {
       const item = diagnostic[field];
       return item === null || (typeof item === "number" && Number.isFinite(item) && item >= 0 && item <= 10_000);
     });
+  }
+  if (value.scope === "calendar_event") {
+    if (!isRecord(value.value)) return false;
+    const event = value.value;
+    return event.id === value.key && typeof event.uid === "string" && event.uid.length <= 500 && typeof event.title === "string" && event.title.trim().length > 0 && event.title.length <= 120 &&
+      typeof event.start === "string" && !Number.isNaN(Date.parse(event.start)) && typeof event.end === "string" && !Number.isNaN(Date.parse(event.end)) && Date.parse(event.end) > Date.parse(event.start) &&
+      typeof event.allDay === "boolean" && typeof event.location === "string" && event.location.length <= 160 && typeof event.description === "string" && event.description.length <= 1000 && ["training", "game", "tournament", "other"].includes(String(event.type));
   }
   if (value.scope === "tactic") {
     if (["attack", "defense", "corner"].includes(value.key)) return validTacticLayout(value.value);
@@ -227,7 +236,7 @@ export async function PATCH(request: Request) {
           return privateJson({ error: "Die Sicherheitsmigration Phase 3 fehlt noch.", migrationRequired: true }, { status: 409 });
         }
         if (detail.includes("invalid_scope") || detail.includes("coaching_records_scope_check")) {
-          return privateJson({ error: "Die Supabase-Erweiterung für Taktiken fehlt noch.", migrationRequired: true }, { status: 409 });
+          return privateJson({ error: "Die zugehörige Supabase-Erweiterung fehlt noch.", migrationRequired: true }, { status: 409 });
         }
         throw new Error(`Supabase ${response.status}: ${detail.slice(0, 160)}`);
       }
