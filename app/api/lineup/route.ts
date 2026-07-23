@@ -28,7 +28,10 @@ export async function GET(request: Request) {
   if (!(await isAuthenticated())) {
     return Response.json({ error: "Nicht angemeldet." }, { status: 401 });
   }
-  const lineupId = new URL(request.url).searchParams.get("lineupId") ?? "default";
+  const params = new URL(request.url).searchParams;
+  const eventLineups = params.get("eventLineups") === "1";
+  const lineupId = params.get("lineupId") ?? "default";
+  if (eventLineups && params.has("lineupId")) return Response.json({ error: "Ungültige Aufstellungsabfrage." }, { status: 400 });
   if (!validLineupId(lineupId)) return Response.json({ error: "Ungültige Aufstellung." }, { status: 400 });
 
   const supabase = await getSupabaseConfig();
@@ -37,6 +40,25 @@ export async function GET(request: Request) {
   }
 
   try {
+    if (eventLineups) {
+      let response = await fetch(
+        `${supabase.url}/rest/v1/lineup_positions?select=lineup_id,position_id,players,revision&lineup_id=like.event-*`,
+        { headers: supabaseHeaders(supabase.key), cache: "no-store" },
+      );
+      if (!response.ok) {
+        response = await fetch(
+          `${supabase.url}/rest/v1/lineup_positions?select=lineup_id,position_id,players&lineup_id=like.event-*`,
+          { headers: supabaseHeaders(supabase.key), cache: "no-store" },
+        );
+        if (!response.ok) throw new Error(`Supabase responded with ${response.status}`);
+      }
+      const rows = (await response.json()) as Array<{ lineup_id: string; position_id: string; players: Player[]; revision?: number }>;
+      const lineups: Record<string, Record<string, Player[]>> = {};
+      rows.filter((row) => validLineupId(row.lineup_id) && positionIds.has(row.position_id) && validPlayers(row.players)).forEach((row) => {
+        (lineups[row.lineup_id] ??= {})[row.position_id] = row.players;
+      });
+      return Response.json({ lineups, connected: true, migrationRequired: rows.some((row) => row.revision === undefined) }, { headers: { "cache-control": "private, no-store" } });
+    }
     let response = await fetch(
       `${supabase.url}/rest/v1/lineup_positions?select=position_id,players,revision&lineup_id=eq.${encodeURIComponent(lineupId)}`,
       { headers: supabaseHeaders(supabase.key), cache: "no-store" },
