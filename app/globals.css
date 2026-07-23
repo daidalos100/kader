@@ -473,6 +473,15 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .season-metric-value .diagnostic-crown { display: inline-flex; margin: 0; font-size: .88rem; line-height: 1; }
 .season-progress { height: 5px; margin: 1px 0 2px; overflow: hidden; border-radius: 99px; background: rgba(244,243,239,.14); }
 .season-progress span { display: block; height: 100%; border-radius: inherit; background: #00b050; transition: width .25s ease; }
+.static-card .fc-metrics { flex: 0 0 auto; width: 100%; }
+.static-card .fc-metrics > .season-metric { display: grid; grid-template-rows: minmax(34px, auto) auto; align-content: center; min-height: 88px; padding: 13px 14px; }
+.static-card .fc-metrics .season-metric-value { grid-template-columns: auto minmax(0, 1fr); min-width: 0; padding: 0; }
+.static-card .season-metric-value strong { min-width: 0; overflow: visible; font-size: clamp(1.25rem, 2.1vw, 1.7rem); letter-spacing: -.04em; white-space: nowrap; }
+.static-card .fc-metrics > .season-metric > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.static-card .diagnostic-overview-compact { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px 8px; width: 100%; margin-top: 14px; }
+.static-card .diagnostic-overview-compact > strong { grid-column: 1 / -1; margin-bottom: 1px; font-size: .56rem; }
+.static-card .diagnostic-overview-compact > div { justify-content: flex-start; gap: 5px; min-width: 0; padding: 2px 0; border: 0; font-size: .56rem; }
+.static-card .diagnostic-overview-compact > div > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fc-metrics span { color: #85878d; font-size: .58rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .diagnostic-overview { display: grid; gap: 0; width: 100%; margin-top: 12px; }
 .diagnostic-overview > strong { margin-bottom: 5px; font-size: .65rem; letter-spacing: .08em; text-transform: uppercase; }
@@ -493,6 +502,10 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .diagnostic-detail-record-head time { color: #85878d; font-size: .65rem; }
 .diagnostic-detail-record > div:not(.diagnostic-detail-record-head) { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(244,243,239,.1); }
 .diagnostic-detail-record > div:not(.diagnostic-detail-record-head) > span { display: grid; gap: 3px; }
+.diagnostic-detail-label { display: grid !important; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 8px; }
+.diagnostic-detail-label > strong { min-width: 0; }
+.diagnostic-detail-label > small { grid-column: 2; }
+.diagnostic-detail-label > .diagnostic-dot { grid-row: 1 / span 2; }
 .diagnostic-detail-record strong { color: #d9dadd; }
 .diagnostic-detail-record b { text-align: right; }
 .diagnostic-detail-record small { display: block; color: #777a80; font-size: .58rem; font-weight: 500; }
@@ -500,6 +513,7 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .diagnostic-detail-record em { font-style: normal; text-align: right; }
 .delta-positive { color: #55ce75; }
 .delta-negative { color: #ff6c70; }
+.delta-neutral { color: #aeb0b6; }
 .stats-layout { display: grid; grid-template-columns: minmax(580px, 1fr) minmax(390px, .62fr); gap: 18px; align-items: start; }
 .stats-table-wrap { overflow-x: auto; border: 1px solid rgba(244,243,239,.15); }
 .stats-table { width: 100%; border-collapse: collapse; background: #101115; }
@@ -681,6 +695,9 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
   .lineup-module .planner-intro { padding-top: 25px; }
   .player-card-grid { grid-template-columns: 1fr; }
   .fc-card, .fc-card-inner { height: 700px; min-height: 0; }
+  .static-card .fc-metrics > .season-metric { min-height: 80px; padding: 11px 10px; }
+  .static-card .fc-metrics .season-metric-value { gap: 6px; }
+  .static-card .season-metric-value strong { font-size: 1.3rem; }
   .card-flip-area > img { width: min(260px, 80%); }
   .form-grid { grid-template-columns: 1fr; }
   .form-grid .wide { grid-column: auto; }
@@ -711,17 +728,4 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
   .tactics-workspace.presenting .tactics-actions { justify-content: flex-end; }
   .tactics-workspace.presenting .tactics-scenarios { margin-inline: -8px; padding-inline: 8px; }
   .tactics-workspace.presenting .tactics-pitch { height: calc(100dvh - 120px); min-height: 720px; }
-}
-
-.static-card .fc-metrics { flex: 0 0 auto; width: 100%; }
-.static-card .fc-metrics > .season-metric { display: grid; grid-template-rows: minmax(34px, auto) auto; align-content: center; min-height: 88px; padding: 13px 14px; }
-.static-card .season-metric-value { grid-template-columns: auto minmax(0, 1fr); min-width: 0; }
-.static-card .season-metric-value strong { min-width: 0; overflow: hidden; font-size: clamp(1.35rem, 2.2vw, 1.75rem); text-overflow: ellipsis; white-space: nowrap; }
-.static-card .fc-metrics > .season-metric > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.static-card .fc-metrics .season-metric-value { grid-template-columns: auto minmax(0, 1fr); min-width: 0; padding: 0; }
-.static-card .season-metric-value strong { min-width: 0; overflow: visible; font-size: clamp(1.25rem, 2.1vw, 1.7rem); letter-spacing: -.04em; white-space: nowrap; }
-@media (max-width: 560px) {
-  .static-card .fc-metrics .season-metric-value { gap: 6px; }
-  .static-card .season-metric-value strong { font-size: 1.3rem; }
 }
