@@ -411,6 +411,7 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .event-card-actions .primary-action:hover { color: var(--red); }
 .calendar-layout { display: grid; grid-template-columns: minmax(320px, .72fr) minmax(560px, 1.28fr); gap: 18px; align-items: start; }
 .calendar-list { display: grid; gap: 10px; max-height: calc(100dvh - 240px); overflow-y: auto; padding-right: 5px; }
+.mobile-calendar-detail { display: none; }
 .calendar-empty { margin: 0; padding: 16px; border: 1px solid rgba(244,243,239,.12); color: #8f9197; font-size: .8rem; }
 .calendar-list .event-card { min-height: 190px; }
 .calendar-list .calendar-next-anchor { border-color: rgba(239,22,28,.7); box-shadow: inset 3px 0 0 var(--red); scroll-margin-top: 10px; }
@@ -761,6 +762,8 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
   .matchday-layout { grid-template-columns: 1fr; }
   .matchday-history { order: 2; }
   .calendar-list { max-height: none; }
+  .calendar-desktop-detail { display: none; }
+  .mobile-calendar-detail { display: block; position: relative; top: auto; min-height: 0; max-height: none; margin: -2px 0 10px; scroll-margin-top: 14px; }
   .event-detail, .match-editor { position: static; max-height: none; }
   .event-detail { min-height: 0; }
   .empty-detail { min-height: 220px; }
