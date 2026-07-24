@@ -39,7 +39,11 @@ test("security and conflict controls stay present", async () => {
   }
   assert.ok(auth.includes("HMAC"));
   assert.ok(auth.includes("sessionMaxAgeSeconds"));
-  assert.ok(login.includes('inputMode="text"'));
+  assert.ok(auth.includes("TRAINER_ACCESS_JSON"));
+  assert.ok(auth.includes("TRAINER_SESSION_SECRET"));
+  assert.ok(login.includes('inputMode={isOtp ? "email" : "text"}'));
+  assert.ok(await source("app/auth/callback/page.tsx").then((callback) => callback.includes("access_token")));
+  assert.ok((await source("app/api/auth/route.ts")).includes("create_user: false"));
   assert.ok(stateRoute.includes("expectedRevision"));
   assert.ok(stateRoute.includes("status: 409"));
   for (const control of ["enable row level security", "apply_coaching_record", "consume_login_attempt", "coaching_history", "coaching_backups"]) {
