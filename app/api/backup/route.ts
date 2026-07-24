@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { isAuthenticated } from "../../auth";
+import { currentTrainer, isAuthenticated } from "../../auth";
 import { getSupabaseConfig, supabaseHeaders } from "../../lib/supabase";
 
 const SEASON_ID = "d1-2026-27";
@@ -45,13 +45,14 @@ export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET?.trim();
   const authorizedCron = Boolean(secret && request.headers.get("authorization") === `Bearer ${secret}`);
   if (!authorizedCron && !(await isAuthenticated())) return Response.json({ error: "Nicht angemeldet." }, { status: 401 });
+  const actor = (await currentTrainer())?.name ?? "trainer";
   try {
     const payload = await snapshot();
     const { url, key } = await getSupabaseConfig();
     const response = await fetch(`${url}/rest/v1/coaching_backups`, {
       method: "POST",
       headers: supabaseHeaders(key!, { prefer: "return=minimal" }),
-      body: JSON.stringify({ season_id: SEASON_ID, payload, created_by: authorizedCron ? "vercel-cron" : "trainer" }),
+      body: JSON.stringify({ season_id: SEASON_ID, payload, created_by: authorizedCron ? "vercel-cron" : actor }),
     });
     if (!response.ok) throw new Error(`Supabase ${response.status}`);
     return Response.json({ backedUp: true }, { headers: { "cache-control": "private, no-store" } });
