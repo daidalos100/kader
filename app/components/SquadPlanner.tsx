@@ -152,10 +152,12 @@ export default function SquadPlanner({
   embedded = false,
   lineupId = "default",
   eventTitle,
+  presentPlayerNames,
 }: {
   embedded?: boolean;
   lineupId?: string;
   eventTitle?: string;
+  presentPlayerNames?: string[];
 }) {
   const [lineup, setLineup] = useState<Lineup>(emptyLineup);
   const [availablePlayers, setAvailablePlayers] = useState<RosterPlayer[]>([]);
@@ -222,8 +224,16 @@ export default function SquadPlanner({
     [lineup],
   );
   const playerCount = useMemo(
-    () => Object.values(lineup).reduce((sum, players) => sum + players.length, 0),
+    () => new Set(
+      Object.values(lineup)
+        .flat()
+        .map((player) => player.firstName.trim().toLocaleLowerCase("de-DE")),
+    ).size,
     [lineup],
+  );
+  const isAttendanceRestricted = Array.isArray(presentPlayerNames);
+  const isAvailableForEvent = (candidate: RosterPlayer) => !isAttendanceRestricted || presentPlayerNames.some(
+    (name) => name.localeCompare(candidate.firstName, "de", { sensitivity: "base" }) === 0,
   );
 
   function openPosition(position: Position) {
@@ -278,7 +288,7 @@ export default function SquadPlanner({
   }
 
   function togglePlayer(candidate: RosterPlayer) {
-    if (!activePosition) return;
+    if (!activePosition || !isAvailableForEvent(candidate)) return;
     const selected = activePlayers.find(
       (player) => player.firstName.localeCompare(candidate.firstName, "de", { sensitivity: "base" }) === 0,
     );
@@ -461,10 +471,11 @@ export default function SquadPlanner({
                     const selected = activePlayers.some(
                       (player) => player.firstName.localeCompare(candidate.firstName, "de", { sensitivity: "base" }) === 0,
                     );
-                    const disabled = !selected && activePlayers.length >= 3;
+                    const unavailable = !isAvailableForEvent(candidate);
+                    const disabled = unavailable || (!selected && activePlayers.length >= 3);
                     return (
                       <button
-                        className={`player-choice${selected ? " selected" : ""}`}
+                        className={`player-choice${selected ? " selected" : ""}${unavailable ? " unavailable" : ""}`}
                         key={candidate.id}
                         type="button"
                         disabled={disabled}
@@ -473,7 +484,7 @@ export default function SquadPlanner({
                       >
                         <PlayerAvatar firstName={candidate.firstName} size={72} />
                         <strong>{candidate.firstName}</strong>
-                        <span>{selected ? "Ausgewählt" : "Auswählen"}</span>
+                        <span>{unavailable ? "Nicht anwesend" : selected ? "Ausgewählt" : "Auswählen"}</span>
                       </button>
                     );
                   })}
