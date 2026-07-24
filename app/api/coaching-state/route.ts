@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { isAuthenticated } from "../../auth";
+import { currentTrainer, isAuthenticated } from "../../auth";
 import { getSupabaseConfig, supabaseHeaders } from "../../lib/supabase";
 
 const SEASON_ID = "d1-2026-27";
@@ -225,6 +225,7 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   if (!(await isAuthenticated())) return privateJson({ error: "Nicht angemeldet." }, { status: 401 });
+  const actor = (await currentTrainer())?.name ?? "trainer";
   const { url, key } = await getSupabaseConfig();
   if (!url || !key) return privateJson({ error: "Supabase ist nicht verbunden." }, { status: 503 });
 
@@ -246,7 +247,7 @@ export async function PATCH(request: Request) {
           p_record_key: operation.key,
           p_data: operation.value,
           p_expected_revision: operation.expectedRevision,
-          p_actor: "trainer",
+          p_actor: actor,
         }),
       });
       if (!response.ok) {
