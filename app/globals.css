@@ -59,6 +59,8 @@ button { color: inherit; touch-action: manipulation; -webkit-tap-highlight-color
 .login-card label { margin-bottom: 7px; color: #8f9197; font-size: .65rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
 .login-card input { height: 56px; padding: 0 16px; border: 1px solid rgba(244,243,239,.22); outline: 0; background: #08090c; color: var(--white); font-size: 1.25rem; text-align: center; letter-spacing: .35em; }
 .login-card input:focus { border-color: var(--red); }
+.login-card #trainer-login, .login-card #trainer-password { text-align: left; letter-spacing: normal; }
+.login-card #trainer-login + label { margin-top: 18px; }
 .login-card button { height: 52px; margin-top: 10px; border: 1px solid var(--red); background: var(--red); color: var(--white); font-size: .72rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
 .login-card button:disabled { opacity: .45; cursor: default; }
 .login-error { margin: 14px 0 0; color: #ff8e91; font-size: .8rem; }
