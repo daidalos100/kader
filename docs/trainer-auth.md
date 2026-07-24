@@ -23,3 +23,5 @@ https://kader02.vercel.app/auth/callback
 ```
 
 Danach führt die erste Anmeldung einer freigegebenen Adresse automatisch zur Einladung per E-Mail. Nicht gelistete Adressen können weder eingeladen werden noch eine Sitzung eröffnen. Der bisherige `EDIT_PIN` kann erst entfernt werden, nachdem der E-Mail-Login erfolgreich getestet wurde.
+
+Nach Änderungen an Vercel-Variablen muss ein neuer Production-Deploy erfolgen.
