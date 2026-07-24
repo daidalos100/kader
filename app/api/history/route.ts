@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { isAuthenticated } from "../../auth";
+import { currentTrainer, isAuthenticated } from "../../auth";
 import { getSupabaseConfig, supabaseHeaders } from "../../lib/supabase";
 
 const SEASON_ID = "d1-2026-27";
@@ -30,6 +30,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   if (!(await isAuthenticated())) return privateJson({ error: "Nicht angemeldet." }, { status: 401 });
+  const actor = (await currentTrainer())?.name ?? "trainer";
   const body = (await request.json().catch(() => null)) as { historyId?: unknown } | null;
   if (!body || !Number.isSafeInteger(body.historyId) || Number(body.historyId) < 1) {
     return privateJson({ error: "Ungültiger Verlaufseintrag." }, { status: 400 });
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
       method: "POST",
       headers: supabaseHeaders(key),
       cache: "no-store",
-      body: JSON.stringify({ p_history_id: body.historyId, p_actor: "trainer (Wiederherstellung)" }),
+      body: JSON.stringify({ p_history_id: body.historyId, p_actor: `${actor} (Wiederherstellung)` }),
     });
     if (!response.ok) throw new Error(`Supabase ${response.status}`);
     return privateJson({ restored: true });
