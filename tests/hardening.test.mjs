@@ -93,6 +93,7 @@ test("appearances are derived from saved matchday lineups", async () => {
   }
   assert.ok(route.includes('params.get("eventLineups")'));
   assert.ok(route.includes("lineup_id=like.event-*"));
+  assert.ok(component.includes("const seasonStart = calendarVisibleFrom"), "all D1 game dates from 07.07.2026 must count");
 });
 
 test("calendar keeps its chronology from 07.07.2026 and stores local event overrides", async () => {
@@ -100,6 +101,8 @@ test("calendar keeps its chronology from 07.07.2026 and stores local event overr
     source("app/lib/calendar.ts"), source("app/components/CoachingTool.tsx"), source("app/api/coaching-state/route.ts"), source("supabase/phase5-calendar-overrides.sql"),
   ]);
   assert.ok(calendar.includes("24 * 365"));
+  assert.ok(component.includes("mobile-calendar-detail"));
+  assert.ok(component.includes("scrollIntoView"));
   for (const marker of ["calendarVisibleFrom", "next-calendar-event", "calendarOverrides", "Termin bearbeiten", "Google-Kalender bleibt unverändert", "TEILNAHME", "not_selected", "Nicht im Kader", "Noch nicht erfasst", "Entschuldigt${reason"]) assert.ok(component.includes(marker), `missing ${marker}`);
   assert.ok(route.includes('"calendar_event"'));
   assert.ok(migration.includes("calendar_event"));
