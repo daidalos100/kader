@@ -82,6 +82,17 @@ async function requestEmailLogin(email: string, origin: string) {
   });
   if (otp.ok) return { ok: true, status: 200 };
 
+  // Supabase begrenzt den Versand von Magic Links pro Adresse. In diesem Fall
+  // ist der Account bereits vorhanden; eine Einladung würde nur mit 422
+  // scheitern und die eigentliche Ursache verschleiern.
+  if (otp.status === 429) {
+    return {
+      ok: false,
+      status: 429,
+      retryAfter: Number(otp.headers.get("retry-after") ?? 60),
+    };
+  }
+
   // Für eine freigegebene, aber noch nicht eingeladene Adresse wird genau einmal
   // ein Auth-Konto erzeugt. Nicht freigegebene Adressen gelangen nie hierher.
   const invitation = await fetch(`${url}/auth/v1/invite`, {
@@ -141,6 +152,13 @@ export async function POST(request: Request) {
     if (!rate.allowed) return privateJson({ error: "Zu viele Versuche. Bitte später erneut versuchen." }, { status: 429, headers: { "retry-after": String(Math.max(1, rate.retryAfter)) } });
     if (!allowed) return privateJson({ error: "Diese E-Mail-Adresse ist nicht für das Coaching Tool freigegeben." }, { status: 403 });
     const result = await requestEmailLogin(email, new URL(request.url).origin);
+    if (!result.ok && result.status === 429) {
+      const retryAfter = typeof result.retryAfter === "number" ? Math.max(60, Math.ceil(result.retryAfter)) : 60;
+      return privateJson(
+        { error: "Der Anmeldelink wurde gerade bereits angefordert. Bitte kurz warten und anschließend erneut versuchen." },
+        { status: 429, headers: { "retry-after": String(retryAfter) } },
+      );
+    }
     if (!result.ok) return privateJson({ error: "Die Anmelde-E-Mail konnte gerade nicht versendet werden. Bitte erneut versuchen." }, { status: 502 });
     return privateJson({ dispatched: true });
   }
