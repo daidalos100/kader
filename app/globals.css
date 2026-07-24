@@ -376,6 +376,13 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .view-heading h1 { max-width: 900px; margin: 9px 0 10px; font-size: clamp(3rem, 8vw, 7.6rem); line-height: .82; letter-spacing: -.065em; text-transform: uppercase; }
 .view-heading.compact h1 { font-size: clamp(3rem, 6.5vw, 6.2rem); }
 .view-heading p:last-child { max-width: 690px; margin: 0; color: #aaa; line-height: 1.6; }
+.overview-quote { max-width: 760px !important; color: #d9d9db !important; font-size: clamp(.96rem, 1.55vw, 1.15rem); font-style: italic; line-height: 1.55 !important; }
+.overview-quote > span, .overview-quote > cite { display: inline-block; }
+.overview-quote > span { animation: overview-quote-reveal .85s cubic-bezier(.2,.8,.2,1) both; }
+.overview-quote > cite { margin-left: .35em; color: #f14b4f; font-style: normal; font-weight: 750; white-space: nowrap; animation: overview-quote-author .38s .56s both; }
+@keyframes overview-quote-reveal { from { clip-path: inset(0 100% 0 0); opacity: 0; transform: translateX(-12px); } to { clip-path: inset(0 0 0 0); opacity: 1; transform: translateX(0); } }
+@keyframes overview-quote-author { from { opacity: 0; transform: translateX(-5px); } to { opacity: 1; transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { .overview-quote > span, .overview-quote > cite { animation: none; } }
 .overview-claim { width: min(270px, 24vw); height: auto; margin-bottom: 12px; }
 .overview-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(440px, .75fr); gap: 18px; }
 .next-event-card { position: relative; min-height: 330px; overflow: hidden; padding: clamp(28px, 4vw, 52px); border: 1px solid rgba(244,243,239,.17); background: linear-gradient(135deg, rgba(239,22,28,.2), transparent 58%), #111318; }
