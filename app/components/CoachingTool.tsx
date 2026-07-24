@@ -698,7 +698,14 @@ export default function CoachingTool() {
                 <div><p className="section-index">KADERPLANUNG</p><strong>{selectedEvent ? selectedEvent.title : "Allgemeine Aufstellung"}</strong></div>
                 {selectedEvent && <button className="text-button" onClick={() => setSelectedEvent(null)}>Allgemeine Aufstellung öffnen</button>}
               </div>
-              <SquadPlanner embedded lineupId={selectedEvent ? eventLineupId(selectedEvent) : "default"} eventTitle={selectedEvent?.title} />
+              <SquadPlanner
+                embedded
+                lineupId={selectedEvent ? eventLineupId(selectedEvent) : "default"}
+                eventTitle={selectedEvent?.title}
+                presentPlayerNames={selectedEvent
+                  ? profiles.filter((player) => state.attendance[selectedEvent.id]?.[player.id] === "present").map((player) => player.firstName)
+                  : undefined}
+              />
             </section>
           )}
 
