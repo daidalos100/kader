@@ -150,6 +150,7 @@ function eventLineupId(event: CalendarEvent) {
 export default function CoachingTool() {
   const [tab, setTab] = useState<Tab>("overview");
   const [overviewQuote, setOverviewQuote] = useState<(typeof trainerQuotes)[number]>(trainerQuotes[0]);
+  const [overviewQuoteVersion, setOverviewQuoteVersion] = useState(0);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [state, setState] = useState<CoachingState>(emptyState);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -188,6 +189,7 @@ export default function CoachingTool() {
   useEffect(() => {
     if (tab !== "overview") return;
     setOverviewQuote(trainerQuotes[Math.floor(Math.random() * trainerQuotes.length)]);
+    setOverviewQuoteVersion((current) => current + 1);
   }, [tab]);
 
   useEffect(() => {
@@ -591,7 +593,7 @@ export default function CoachingTool() {
           {tab === "overview" && (
             <section className="coach-view">
               <div className="view-heading">
-                <div><p className="section-index">SAISON 2026/27</p><h1>Alles im Blick.</h1><p className="overview-quote" key={overviewQuote.text} aria-live="polite"><span>„{overviewQuote.text}“</span><cite>— {overviewQuote.author}</cite></p></div>
+                <div><p className="section-index">SAISON 2026/27</p><h1>Alles im Blick.</h1><p className="overview-quote" key={`${overviewQuote.text}-${overviewQuoteVersion}`} aria-live="polite"><span>„{overviewQuote.text}“</span><cite>— {overviewQuote.author}</cite></p></div>
                 <Image className="overview-claim" src="/brand/allez-tsg.png" alt="Allez TSG" width={270} height={65} unoptimized />
               </div>
               <div className="overview-grid">
