@@ -8,7 +8,7 @@ type RuntimeEnv = {
 
 export type TrainerRole = "admin" | "trainer";
 export type Trainer = { email: string; name: string; role: TrainerRole };
-export type AuthMode = "pin" | "otp";
+export type AuthMode = "pin" | "password";
 
 export const sessionCookieName = "tsg_kader_session";
 export const sessionMaxAgeSeconds = 60 * 60 * 12;
@@ -57,12 +57,17 @@ export async function trainerAccess(): Promise<Trainer[]> {
 }
 
 export async function authMode(): Promise<AuthMode> {
-  return (await trainerAccess()).length > 0 && Boolean(await trainerSessionSecret()) ? "otp" : "pin";
+  return (await trainerAccess()).length > 0 && Boolean(await trainerSessionSecret()) ? "password" : "pin";
 }
 
 export async function trainerForEmail(email: string) {
   const normalized = normalizeEmail(email);
   return (await trainerAccess()).find((trainer) => trainer.email === normalized) ?? null;
+}
+
+export async function trainerForLogin(login: string) {
+  const normalized = normalizeEmail(login);
+  return (await trainerAccess()).find((trainer) => trainer.email === normalized || normalizeEmail(trainer.name) === normalized) ?? null;
 }
 
 function hex(bytes: ArrayBuffer) {
@@ -135,7 +140,7 @@ async function validPinSession(value?: string) {
 }
 
 export async function currentTrainer(): Promise<Trainer | null> {
-  if ((await authMode()) !== "otp") return null;
+  if ((await authMode()) === "pin") return null;
   const secret = await trainerSessionSecret();
   const value = (await cookies()).get(sessionCookieName)?.value;
   if (!secret || !value || value.length > 2_048) return null;
@@ -154,7 +159,7 @@ export async function currentTrainer(): Promise<Trainer | null> {
 }
 
 export async function isAuthenticated() {
-  if ((await authMode()) === "otp") return Boolean(await currentTrainer());
+  if ((await authMode()) === "password") return Boolean(await currentTrainer());
   return validPinSession((await cookies()).get(sessionCookieName)?.value);
 }
 
