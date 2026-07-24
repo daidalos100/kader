@@ -1,6 +1,6 @@
 import {
   anonymousClientHash, authMode, createPinSession, createTrainerSession, pinIsValid, sessionCookieName,
-  sessionMaxAgeSeconds, trainerForEmail,
+  sessionMaxAgeSeconds, trainerForLogin,
 } from "../../auth";
 import { getSupabaseConfig, supabaseHeaders } from "../../lib/supabase";
 
@@ -68,48 +68,6 @@ function authHeaders(key: string, accessToken?: string) {
   };
 }
 
-async function requestEmailLogin(email: string, origin: string) {
-  const trainer = await trainerForEmail(email);
-  const { url, key } = await getSupabaseConfig();
-  if (!trainer || !url || !key) return { ok: false, status: 503 };
-
-  const redirectTo = `${origin}/auth/callback`;
-  const otp = await fetch(`${url}/auth/v1/otp`, {
-    method: "POST",
-    headers: authHeaders(key),
-    cache: "no-store",
-    body: JSON.stringify({ email: trainer.email, create_user: false, gotrue_meta_security: {}, redirect_to: redirectTo }),
-  });
-  if (otp.ok) return { ok: true, status: 200 };
-
-  // Supabase begrenzt den Versand von Magic Links pro Adresse. In diesem Fall
-  // ist der Account bereits vorhanden; eine Einladung würde nur mit 422
-  // scheitern und die eigentliche Ursache verschleiern.
-  if (otp.status === 429) {
-    return {
-      ok: false,
-      status: 429,
-      retryAfter: Number(otp.headers.get("retry-after") ?? 60),
-    };
-  }
-
-  // Für eine freigegebene, aber noch nicht eingeladene Adresse wird genau einmal
-  // ein Auth-Konto erzeugt. Nicht freigegebene Adressen gelangen nie hierher.
-  const invitation = await fetch(`${url}/auth/v1/invite`, {
-    method: "POST",
-    headers: authHeaders(key),
-    cache: "no-store",
-    body: JSON.stringify({ email: trainer.email, data: { name: trainer.name, role: trainer.role }, redirect_to: redirectTo }),
-  });
-  if (!invitation.ok) {
-    console.error("trainer_magic_link_dispatch_failed", {
-      otpStatus: otp.status,
-      inviteStatus: invitation.status,
-    });
-  }
-  return { ok: invitation.ok, status: invitation.status };
-}
-
 async function finishEmailLogin(accessToken: string) {
   if (accessToken.length < 40 || accessToken.length > 8_192) return null;
   const { url, key } = await getSupabaseConfig();
@@ -120,19 +78,19 @@ async function finishEmailLogin(accessToken: string) {
   });
   if (!response.ok) return null;
   const user = (await response.json().catch(() => null)) as { email?: unknown } | null;
-  return typeof user?.email === "string" ? trainerForEmail(user.email) : null;
+  return typeof user?.email === "string" ? trainerForLogin(user.email) : null;
 }
 
-async function finishEmailOtp(email: string, token: string) {
-  if (!/^[A-Za-z0-9]{4,12}$/.test(token)) return null;
-  const trainer = await trainerForEmail(email);
+async function finishPasswordLogin(login: string, password: string) {
+  if (password.length < 12 || password.length > 256) return null;
+  const trainer = await trainerForLogin(login);
   const { url, key } = await getSupabaseConfig();
   if (!trainer || !url || !key) return null;
-  const response = await fetch(`${url}/auth/v1/verify`, {
+  const response = await fetch(`${url}/auth/v1/token?grant_type=password`, {
     method: "POST",
     headers: authHeaders(key),
     cache: "no-store",
-    body: JSON.stringify({ email: trainer.email, token, type: "email" }),
+    body: JSON.stringify({ email: trainer.email, password }),
   });
   if (!response.ok) return null;
   const session = (await response.json().catch(() => null)) as { access_token?: unknown } | null;
@@ -144,52 +102,23 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as { pin?: unknown; email?: unknown; token?: unknown; accessToken?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { pin?: unknown; login?: unknown; password?: unknown } | null;
   const mode = await authMode();
   const clientHash = await anonymousClientHash(request);
 
-  if (mode === "otp") {
-    if (typeof body?.accessToken === "string") {
-      const trainer = await finishEmailLogin(body.accessToken);
-      const rate = await consumeAttempt(clientHash, Boolean(trainer));
-      if (!rate.allowed) return privateJson({ error: "Zu viele Versuche. Bitte später erneut versuchen." }, { status: 429, headers: { "retry-after": String(Math.max(1, rate.retryAfter)) } });
-      if (!trainer) return privateJson({ error: "Der Anmeldelink ist ungültig oder abgelaufen." }, { status: 401 });
-      const session = await createTrainerSession(trainer);
-      if (!session) return privateJson({ error: "Zugang ist noch nicht vollständig konfiguriert." }, { status: 503 });
-      return privateJson(
-        { authorized: true, trainer: { name: trainer.name, role: trainer.role } },
-        { headers: { "set-cookie": `${sessionCookieName}=${session}; ${sessionResponse()}` } },
-      );
-    }
-
-    const email = typeof body?.email === "string" ? body.email.trim() : "";
-    if (typeof body?.token === "string") {
-      const trainer = await finishEmailOtp(email, body.token.trim());
-      const rate = await consumeAttempt(clientHash, Boolean(trainer));
-      if (!rate.allowed) return privateJson({ error: "Zu viele Versuche. Bitte später erneut versuchen." }, { status: 429, headers: { "retry-after": String(Math.max(1, rate.retryAfter)) } });
-      if (!trainer) return privateJson({ error: "Der Anmeldecode ist ungültig oder abgelaufen. Bitte einen neuen Code anfordern." }, { status: 401 });
-      const session = await createTrainerSession(trainer);
-      if (!session) return privateJson({ error: "Zugang ist noch nicht vollständig konfiguriert." }, { status: 503 });
-      return privateJson(
-        { authorized: true, trainer: { name: trainer.name, role: trainer.role } },
-        { headers: { "set-cookie": `${sessionCookieName}=${session}; ${sessionResponse()}` } },
-      );
-    }
-
-    const allowed = Boolean(email && await trainerForEmail(email));
-    const rate = await consumeAttempt(clientHash, allowed);
+  if (mode === "password") {
+    const login = typeof body?.login === "string" ? body.login.trim() : "";
+    const password = typeof body?.password === "string" ? body.password : "";
+    const trainer = await finishPasswordLogin(login, password);
+    const rate = await consumeAttempt(clientHash, Boolean(trainer));
     if (!rate.allowed) return privateJson({ error: "Zu viele Versuche. Bitte später erneut versuchen." }, { status: 429, headers: { "retry-after": String(Math.max(1, rate.retryAfter)) } });
-    if (!allowed) return privateJson({ error: "Diese E-Mail-Adresse ist nicht für das Coaching Tool freigegeben." }, { status: 403 });
-    const result = await requestEmailLogin(email, new URL(request.url).origin);
-    if (!result.ok && result.status === 429) {
-      const retryAfter = typeof result.retryAfter === "number" ? Math.max(60, Math.ceil(result.retryAfter)) : 60;
-      return privateJson(
-        { error: "Der Anmeldelink wurde gerade bereits angefordert. Bitte kurz warten und anschließend erneut versuchen." },
-        { status: 429, headers: { "retry-after": String(retryAfter) } },
-      );
-    }
-    if (!result.ok) return privateJson({ error: "Die Anmelde-E-Mail konnte gerade nicht versendet werden. Bitte erneut versuchen." }, { status: 502 });
-    return privateJson({ dispatched: true });
+    if (!trainer) return privateJson({ error: "Benutzername oder Passwort ist nicht korrekt." }, { status: 401 });
+    const session = await createTrainerSession(trainer);
+    if (!session) return privateJson({ error: "Zugang ist noch nicht vollständig konfiguriert." }, { status: 503 });
+    return privateJson(
+      { authorized: true, trainer: { name: trainer.name, role: trainer.role } },
+      { headers: { "set-cookie": `${sessionCookieName}=${session}; ${sessionResponse()}` } },
+    );
   }
 
   const provided = typeof body?.pin === "string" ? body.pin : "";
