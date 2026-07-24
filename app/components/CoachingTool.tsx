@@ -235,8 +235,9 @@ export default function CoachingTool() {
   useEffect(() => {
     if (tab !== "calendar") return;
     const frame = window.requestAnimationFrame(() => {
-      if (selectedCalendarEventId && window.matchMedia("(max-width: 820px)").matches) {
-        mobileCalendarDetailRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+      if (window.matchMedia("(max-width: 820px)").matches) {
+        if (selectedCalendarEventId) mobileCalendarDetailRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+        else document.getElementById("next-calendar-event")?.scrollIntoView({ block: "start", behavior: "smooth" });
         return;
       }
       if (!nextCalendarEventId) return;
