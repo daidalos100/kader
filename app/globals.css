@@ -218,6 +218,8 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .player-choice:hover:not(:disabled) { transform: translateY(-2px); border-color: rgba(239,22,28,.8); background: #1d1e23; }
 .player-choice.selected { border-color: var(--red); background: rgba(239,22,28,.12); box-shadow: inset 0 0 0 1px rgba(239,22,28,.25); }
 .player-choice:disabled { opacity: .34; cursor: default; }
+.player-choice.unavailable { border-color: rgba(244,243,239,.1); filter: grayscale(1); }
+.player-choice.unavailable > span { color: #9a9ca2; }
 .player-choice .player-avatar { width: 72px; height: 72px; margin-bottom: 9px; border-width: 2px; }
 .player-choice strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: .86rem; white-space: nowrap; }
 .player-choice > span { margin-top: 4px; color: #777980; font-size: .52rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
