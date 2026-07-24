@@ -3,21 +3,20 @@
 import Image from "next/image";
 import { FormEvent, useEffect, useState } from "react";
 
-type AuthMode = "pin" | "otp";
+type AuthMode = "pin" | "password";
 
 export default function LoginPage() {
   const [mode, setMode] = useState<AuthMode | null>(null);
+  const [loginName, setLoginName] = useState("");
+  const [password, setPassword] = useState("");
   const [pin, setPin] = useState("");
-  const [email, setEmail] = useState("");
-  const [token, setToken] = useState("");
-  const [codeRequested, setCodeRequested] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth", { cache: "no-store" })
       .then((response) => response.json())
-      .then((data) => setMode(data.mode === "otp" ? "otp" : "pin"))
+      .then((data) => setMode(data.mode === "password" ? "password" : "pin"))
       .catch(() => setMode("pin"));
   }, []);
 
@@ -30,30 +29,21 @@ export default function LoginPage() {
       const response = await fetch("/api/auth", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(mode === "otp" ? (codeRequested ? { email, token } : { email }) : { pin }),
+        body: JSON.stringify(mode === "password" ? { login: loginName, password } : { pin }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Anmeldung fehlgeschlagen.");
-      if (mode === "otp") {
-        if (codeRequested) {
-          window.location.assign("/");
-          return;
-        }
-        setCodeRequested(true);
-        setMessage("Anmeldecode gesendet. Bitte den Code aus der E-Mail eingeben.");
-        return;
-      }
       window.location.assign("/");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Anmeldung fehlgeschlagen.");
+      setPassword("");
       setPin("");
     } finally {
       setLoading(false);
     }
   }
 
-  const isOtp = mode === "otp";
-  const value = isOtp ? (codeRequested ? token : email) : pin;
+  const passwordLogin = mode === "password";
 
   return (
     <main className="login-shell">
@@ -61,25 +51,51 @@ export default function LoginPage() {
         <Image src="/brand/tsg-logo.png" alt="TSG Tübingen" width={110} height={110} priority unoptimized />
         <p className="section-index">GESCHÜTZTER BEREICH</p>
         <h1>Kader D1</h1>
-        <p>{isOtp ? "Mit deiner freigegebenen Trainer-E-Mail anmelden. Wir senden dir einen einmaligen Anmeldecode." : "Bitte Bearbeitungs-PIN eingeben, um die Aufstellung zu öffnen."}</p>
+        <p>{passwordLogin ? "Mit deinem persönlichen Trainerzugang anmelden." : "Bitte Bearbeitungs-PIN eingeben, um die Aufstellung zu öffnen."}</p>
         <form onSubmit={login}>
-          <label htmlFor="site-login">{isOtp ? (codeRequested ? "Anmeldecode" : "Trainer-E-Mail") : "PIN"}</label>
-          <input
-            id="site-login"
-            type={isOtp && !codeRequested ? "email" : "text"}
-            inputMode={isOtp ? (codeRequested ? "numeric" : "email") : "text"}
-            autoComplete={isOtp ? (codeRequested ? "one-time-code" : "email") : "current-password"}
-            autoCapitalize="none"
-            spellCheck={false}
-            maxLength={isOtp ? (codeRequested ? 12 : 254) : 128}
-            autoFocus
-            disabled={!mode}
-            value={value}
-            onChange={(event) => isOtp
-              ? (codeRequested ? setToken(event.target.value.replace(/\s/g, "")) : setEmail(event.target.value))
-              : setPin(event.target.value)}
-          />
-          <button type="submit" disabled={!value || loading || !mode}>{loading ? "Wird geprüft …" : isOtp ? (codeRequested ? "Code bestätigen" : "Anmeldecode senden") : "Aufstellung öffnen"}</button>
+          {passwordLogin ? (
+            <>
+              <label htmlFor="trainer-login">Benutzername oder E-Mail</label>
+              <input
+                id="trainer-login"
+                type="text"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                maxLength={254}
+                autoFocus
+                disabled={!mode}
+                value={loginName}
+                onChange={(event) => setLoginName(event.target.value)}
+              />
+              <label htmlFor="trainer-password">Passwort</label>
+              <input
+                id="trainer-password"
+                type="password"
+                autoComplete="current-password"
+                maxLength={256}
+                disabled={!mode}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </>
+          ) : (
+            <>
+              <label htmlFor="trainer-pin">PIN</label>
+              <input
+                id="trainer-pin"
+                type="password"
+                inputMode="text"
+                autoComplete="current-password"
+                maxLength={128}
+                autoFocus
+                disabled={!mode}
+                value={pin}
+                onChange={(event) => setPin(event.target.value)}
+              />
+            </>
+          )}
+          <button type="submit" disabled={(!passwordLogin ? !pin : !loginName || !password) || loading || !mode}>{loading ? "Wird geprüft …" : passwordLogin ? "Anmelden" : "Aufstellung öffnen"}</button>
         </form>
         {message && <p className="login-error" role="status">{message}</p>}
       </section>
