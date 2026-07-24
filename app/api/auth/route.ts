@@ -60,7 +60,10 @@ async function consumeAttempt(clientHash: string, success: boolean) {
 function authHeaders(key: string, accessToken?: string) {
   return {
     apikey: key,
-    ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+    // Secret Keys sind für die administrativen GoTrue-Endpunkte zusätzlich
+    // als Bearer-Credential erforderlich. Für die Callback-Prüfung wird
+    // stattdessen der kurzlebige Nutzer-Token weitergereicht.
+    authorization: `Bearer ${accessToken ?? key}`,
     "content-type": "application/json",
   };
 }
@@ -87,6 +90,12 @@ async function requestEmailLogin(email: string, origin: string) {
     cache: "no-store",
     body: JSON.stringify({ email: trainer.email, data: { name: trainer.name, role: trainer.role }, redirect_to: redirectTo }),
   });
+  if (!invitation.ok) {
+    console.error("trainer_magic_link_dispatch_failed", {
+      otpStatus: otp.status,
+      inviteStatus: invitation.status,
+    });
+  }
   return { ok: invitation.ok, status: invitation.status };
 }
 
