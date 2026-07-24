@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, Fragment, useEffect, useMemo, useRef, useState } from "react";
 import SquadPlanner from "./SquadPlanner";
 import TacticsBoard, { CustomTactic, TacticEntry, TacticLayout, TacticTemplate } from "./TacticsBoard";
 import type { CalendarEvent } from "../lib/calendar";
@@ -64,8 +64,10 @@ type SaveOperation = { scope: string; key: string; value: unknown; expectedRevis
 type HistoryEntry = { id: number; scope: string; record_key: string; revision: number; changed_at: string; changed_by: string };
 
 const positionOptions = ["TW", "IV", "LV", "RV", "ZDM", "ZM", "LF", "RF", "ST"];
-const seasonStart = new Date("2026-07-25T00:00:00+02:00").getTime();
 const calendarVisibleFrom = new Date("2026-07-07T00:00:00+02:00").getTime();
+// Die erste D1-Planungsphase beginnt mit dem ersten sichtbaren Termin,
+// nicht erst mit dem ersten Turnier. So zählen auch Testspiele ab 07.07. mit.
+const seasonStart = calendarVisibleFrom;
 const emptyState: CoachingState = { roster: [], profiles: {}, attendance: {}, attendanceReasons: {}, matches: {}, diagnostics: {}, tactics: {}, calendarOverrides: {} };
 function playerId(name: string) {
   return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "-");
@@ -147,6 +149,7 @@ export default function CoachingTool() {
   const [editingCalendarEvent, setEditingCalendarEvent] = useState<CalendarEvent | null>(null);
   const [referenceTime] = useState(() => Date.now());
   const calendarListRef = useRef<HTMLDivElement>(null);
+  const mobileCalendarDetailRef = useRef<HTMLDivElement>(null);
 
   const profiles = useMemo(
     () => state.roster.map((name) => profileFor(name, state.profiles[playerId(name)])),
@@ -158,6 +161,7 @@ export default function CoachingTool() {
     .sort((a, b) => a.start.localeCompare(b.start)), [events, state.calendarOverrides]);
   const upcoming = useMemo(() => calendarEvents.filter((event) => new Date(event.start).getTime() >= Math.max(referenceTime, seasonStart)).slice(0, 40), [calendarEvents, referenceTime]);
   const nextCalendarEventId = calendarEvents.find((event) => new Date(event.start).getTime() >= referenceTime)?.id ?? null;
+  const selectedCalendarEventId = selectedEvent?.id ?? null;
   const nextEvents = upcoming.slice(0, 4);
   const nextGame = upcoming.find((event) => event.type === "game" || event.type === "tournament");
   const matchdayEvent = selectedEvent && (selectedEvent.type === "game" || selectedEvent.type === "tournament") ? selectedEvent : nextGame;
@@ -229,14 +233,19 @@ export default function CoachingTool() {
   }, []);
 
   useEffect(() => {
-    if (tab !== "calendar" || !nextCalendarEventId) return;
+    if (tab !== "calendar") return;
     const frame = window.requestAnimationFrame(() => {
+      if (selectedCalendarEventId && window.matchMedia("(max-width: 820px)").matches) {
+        mobileCalendarDetailRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+        return;
+      }
+      if (!nextCalendarEventId) return;
       const list = calendarListRef.current;
       const anchor = list?.querySelector<HTMLElement>("#next-calendar-event");
       if (list && anchor) list.scrollTop = Math.max(0, anchor.offsetTop - 10);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [tab, nextCalendarEventId, calendarEvents.length]);
+  }, [tab, selectedCalendarEventId, nextCalendarEventId, calendarEvents.length]);
 
   async function refreshCoachingState() {
     const response = await fetch("/api/coaching-state", { cache: "no-store" });
@@ -282,7 +291,7 @@ export default function CoachingTool() {
     else if (target === "matchday") setTab("matchday");
     else if (target === "stats") setTab("stats");
     else setTab("calendar");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (target !== "attendance") window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function setAttendance(eventId: string, id: string, status: AttendanceStatus, reason?: AbsenceReason) {
@@ -523,6 +532,8 @@ export default function CoachingTool() {
     return winners;
   }, [profiles, state.diagnostics]);
 
+  const calendarDetail = selectedEvent ? <><AttendancePanel event={selectedEvent} profiles={profiles} attendance={state.attendance[selectedEvent.id] ?? {}} reasons={state.attendanceReasons[selectedEvent.id] ?? {}} onSet={setAttendance} onAll={setAllPresent} onEdit={() => setEditingCalendarEvent(selectedEvent)} />{(selectedEvent.type === "game" || selectedEvent.type === "tournament") && <div className="card-actions"><button onClick={() => openEvent(selectedEvent, "lineup")}>Kader planen</button><button className="secondary" onClick={() => openEvent(selectedEvent, "matchday")}>Spieltag erfassen</button></div>}</> : <div className="empty-detail"><span>←</span><p>Termin auswählen, um Teilnahme, Kader oder Statistik zu bearbeiten.</p></div>;
+
   return (
     <main className="coach-shell">
       <header className="coach-header">
@@ -582,11 +593,9 @@ export default function CoachingTool() {
               <div className="view-heading compact"><div><p className="section-index">GOOGLE KALENDER · LIVE</p><h1>Termine &amp; Teilnahme.</h1><p>Spiele und Trainings werden automatisch aus dem D1-Kalender übernommen.</p></div></div>
               <div className="calendar-layout">
                 <div className="calendar-list" ref={calendarListRef}>
-                  {calendarEvents.length ? calendarEvents.map((event) => <EventCard key={event.id} event={event} active={selectedEvent?.id === event.id} anchor={event.id === nextCalendarEventId} onOpen={openEvent} />) : <p className="calendar-empty">Ab dem 07.07.2026 sind noch keine Termine im Kalender.</p>}
+                  {calendarEvents.length ? calendarEvents.map((event) => <Fragment key={event.id}><EventCard event={event} active={selectedEvent?.id === event.id} anchor={event.id === nextCalendarEventId} onOpen={openEvent} />{selectedEvent?.id === event.id && <div ref={mobileCalendarDetailRef} className="event-detail mobile-calendar-detail">{calendarDetail}</div>}</Fragment>) : <p className="calendar-empty">Ab dem 07.07.2026 sind noch keine Termine im Kalender.</p>}
                 </div>
-                <aside className="event-detail">
-                  {selectedEvent ? <><AttendancePanel event={selectedEvent} profiles={profiles} attendance={state.attendance[selectedEvent.id] ?? {}} reasons={state.attendanceReasons[selectedEvent.id] ?? {}} onSet={setAttendance} onAll={setAllPresent} onEdit={() => setEditingCalendarEvent(selectedEvent)} />{(selectedEvent.type === "game" || selectedEvent.type === "tournament") && <div className="card-actions"><button onClick={() => openEvent(selectedEvent, "lineup")}>Kader planen</button><button className="secondary" onClick={() => openEvent(selectedEvent, "matchday")}>Spieltag erfassen</button></div>}</> : <div className="empty-detail"><span>←</span><p>Termin auswählen, um Teilnahme, Kader oder Statistik zu bearbeiten.</p></div>}
-                </aside>
+                <aside className="event-detail calendar-desktop-detail">{calendarDetail}</aside>
               </div>
             </section>
           )}
