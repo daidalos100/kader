@@ -123,12 +123,28 @@ async function finishEmailLogin(accessToken: string) {
   return typeof user?.email === "string" ? trainerForEmail(user.email) : null;
 }
 
+async function finishEmailOtp(email: string, token: string) {
+  if (!/^[A-Za-z0-9]{4,12}$/.test(token)) return null;
+  const trainer = await trainerForEmail(email);
+  const { url, key } = await getSupabaseConfig();
+  if (!trainer || !url || !key) return null;
+  const response = await fetch(`${url}/auth/v1/verify`, {
+    method: "POST",
+    headers: authHeaders(key),
+    cache: "no-store",
+    body: JSON.stringify({ email: trainer.email, token, type: "email" }),
+  });
+  if (!response.ok) return null;
+  const session = (await response.json().catch(() => null)) as { access_token?: unknown } | null;
+  return typeof session?.access_token === "string" ? finishEmailLogin(session.access_token) : null;
+}
+
 export async function GET() {
   return privateJson({ mode: await authMode() });
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as { pin?: unknown; email?: unknown; accessToken?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { pin?: unknown; email?: unknown; token?: unknown; accessToken?: unknown } | null;
   const mode = await authMode();
   const clientHash = await anonymousClientHash(request);
 
@@ -147,6 +163,19 @@ export async function POST(request: Request) {
     }
 
     const email = typeof body?.email === "string" ? body.email.trim() : "";
+    if (typeof body?.token === "string") {
+      const trainer = await finishEmailOtp(email, body.token.trim());
+      const rate = await consumeAttempt(clientHash, Boolean(trainer));
+      if (!rate.allowed) return privateJson({ error: "Zu viele Versuche. Bitte später erneut versuchen." }, { status: 429, headers: { "retry-after": String(Math.max(1, rate.retryAfter)) } });
+      if (!trainer) return privateJson({ error: "Der Anmeldecode ist ungültig oder abgelaufen. Bitte einen neuen Code anfordern." }, { status: 401 });
+      const session = await createTrainerSession(trainer);
+      if (!session) return privateJson({ error: "Zugang ist noch nicht vollständig konfiguriert." }, { status: 503 });
+      return privateJson(
+        { authorized: true, trainer: { name: trainer.name, role: trainer.role } },
+        { headers: { "set-cookie": `${sessionCookieName}=${session}; ${sessionResponse()}` } },
+      );
+    }
+
     const allowed = Boolean(email && await trainerForEmail(email));
     const rate = await consumeAttempt(clientHash, allowed);
     if (!rate.allowed) return privateJson({ error: "Zu viele Versuche. Bitte später erneut versuchen." }, { status: 429, headers: { "retry-after": String(Math.max(1, rate.retryAfter)) } });
