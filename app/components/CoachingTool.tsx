@@ -49,6 +49,7 @@ type DiagnosticDisciplineKey = "sprint10" | "sprint20" | "agility" | "dribbling"
 type SeasonStatKey = "appearances" | "training" | "goals" | "assists";
 type StatSortKey = "player" | "appearances" | "goals" | "assists" | "training";
 type StatEventDetail = { eventId: string; title: string; date: string; detail: string };
+type StatAward = { kind: "dream-duo" | "clean-sheet"; label: string; title: string };
 type CalendarEventOverride = Pick<CalendarEvent, "id" | "uid" | "title" | "start" | "end" | "allDay" | "location" | "description" | "type">;
 type CoachingState = {
   roster: string[];
@@ -512,6 +513,71 @@ export default function CoachingTool() {
     appearances = appearanceCounts[player.id] ?? 0;
     return { player, appearances, goals, assists, participation: recorded ? Math.round((present / recorded) * 100) : null, appearanceEvents: appearanceEventsByPlayer[player.id] ?? [], goalEvents, assistEvents, trainingEvents };
   });
+  const awardsByPlayer = (() => {
+    const awards: Record<string, StatAward[]> = {};
+    const pairStats = new Map<string, { playerA: string; playerB: string; count: number; eventIds: Set<string> }>();
+    const rosterIds = new Set(profiles.map((player) => player.id));
+
+    Object.entries(state.matches).forEach(([eventId, match]) => {
+      (match.goalEvents ?? []).forEach((goal) => {
+        if (goal.deleted || !goal.assistId || goal.assistId === goal.scorerId) return;
+        if (!rosterIds.has(goal.scorerId) || !rosterIds.has(goal.assistId)) return;
+        const [playerA, playerB] = [goal.scorerId, goal.assistId].sort();
+        const key = `${playerA}:${playerB}`;
+        const pair = pairStats.get(key) ?? { playerA, playerB, count: 0, eventIds: new Set<string>() };
+        pair.count += 1;
+        pair.eventIds.add(eventId);
+        pairStats.set(key, pair);
+      });
+    });
+
+    const dreamDuo = [...pairStats.values()]
+      .filter((pair) => pair.count >= 2)
+      .sort((left, right) => right.count - left.count || `${left.playerA}:${left.playerB}`.localeCompare(`${right.playerA}:${right.playerB}`, "de"))[0];
+    if (dreamDuo) {
+      const playerA = profiles.find((player) => player.id === dreamDuo.playerA);
+      const playerB = profiles.find((player) => player.id === dreamDuo.playerB);
+      if (playerA && playerB) {
+        const gameLabel = dreamDuo.eventIds.size === 1 ? "Spiel" : "Spielen";
+        (awards[playerA.id] ??= []).push({
+          kind: "dream-duo",
+          label: `💫 Traumduo: ${playerB.firstName}`,
+          title: `${dreamDuo.count} gemeinsame Toraktionen in ${dreamDuo.eventIds.size} ${gameLabel}`,
+        });
+        (awards[playerB.id] ??= []).push({
+          kind: "dream-duo",
+          label: `💫 Traumduo: ${playerA.firstName}`,
+          title: `${dreamDuo.count} gemeinsame Toraktionen in ${dreamDuo.eventIds.size} ${gameLabel}`,
+        });
+      }
+    }
+
+    const cleanSheets: Record<string, number> = {};
+    gameEvents.forEach((event) => {
+      const match = state.matches[event.id];
+      if (!match || !/^\s*\d+\s*:\s*0\s*$/.test(match.result)) return;
+      const lineup = eventLineups[eventLineupId(event)] ?? {};
+      const defensivePlayers = new Set<string>();
+      Object.entries(lineup).forEach(([position, lineupPlayers]) => {
+        if (!["TW", "LV", "IV", "RV"].includes(position.toUpperCase())) return;
+        lineupPlayers.forEach((entry) => {
+          const player = profiles.find((item) => item.id === entry.id)
+            ?? profiles.find((item) => item.firstName.localeCompare(entry.firstName?.trim() ?? "", "de", { sensitivity: "base" }) === 0);
+          if (player) defensivePlayers.add(player.id);
+        });
+      });
+      defensivePlayers.forEach((id) => { cleanSheets[id] = (cleanSheets[id] ?? 0) + 1; });
+    });
+    Object.entries(cleanSheets).forEach(([id, count]) => {
+      (awards[id] ??= []).push({
+        kind: "clean-sheet",
+        label: count === 1 ? "🛡️ Weiße Weste" : `🛡️ ${count}`,
+        title: `Bei ${count} ${count === 1 ? "Zu-null-Spiel" : "Zu-null-Spielen"} in der Defensive aufgestellt`,
+      });
+    });
+    return awards;
+  })();
+
   const seasonStatBestByPlayer = useMemo(() => {
     const keys: SeasonStatKey[] = ["appearances", "training", "goals", "assists"];
     const winners: Record<string, Set<SeasonStatKey>> = {};
@@ -696,7 +762,7 @@ export default function CoachingTool() {
           {tab === "stats" && (
             <section className="coach-view">
               <div className="view-heading compact"><div><p className="section-index">SPIELE &amp; ENTWICKLUNG</p><h1>Statistik.</h1><p>Spielwerte werden pro Kalendertermin erfasst und automatisch summiert.</p></div></div>
-              <div className="stats-table-wrap"><StatsTable rows={statsRows} totalMatches={totalMatches} /></div>
+              <div className="stats-table-wrap"><StatsTable rows={statsRows} totalMatches={totalMatches} awardsByPlayer={awardsByPlayer} /></div>
             </section>
           )}
         </>
@@ -891,12 +957,15 @@ function DiagnosticDetailRecord({ diagnostic, previous, bestDisciplineKeys }: { 
   return <section className="diagnostic-detail-record"><div className="diagnostic-detail-record-head"><strong>{diagnostic.ageGroup || "Leistungsdiagnostik"}</strong><time>{diagnostic.date}</time></div>{diagnostic.metrics ? rows.map((row) => <DiagnosticMetricRow key={row.key} label={row.label} metric={row.metric!} unit={row.unit} previous={row.previous?.best ?? null} lowerIsBetter={row.lowerIsBetter} best={bestDisciplineKeys.has(row.key)} />) : <>{([['5 m Sprint', diagnostic.sprint5, previous?.sprint5, 's'], ['10 m Sprint', diagnostic.sprint10, previous?.sprint10, 's'], ['20 m Sprint', diagnostic.sprint20, previous?.sprint20, 's'], ['Agility', diagnostic.agility, previous?.agility, 's'], ['Ausdauer', diagnostic.endurance, previous?.endurance, ''], ['Sprungkraft', diagnostic.jump, previous?.jump, 'cm']] as const).map(([label, value, before, unit]) => <div key={label}><span><strong>{label}</strong></span><b>{value ?? "—"}{value !== null ? ` ${unit}` : ""}</b><Trend current={value} previous={before ?? null} lowerIsBetter={!['Ausdauer', 'Sprungkraft'].includes(label)} unit={unit} /></div>)}</>}</section>;
 }
 
-function StatsTable({ rows, totalMatches }: { rows: Array<{ player: Profile; appearances: number; goals: number; assists: number; participation: number | null; appearanceEvents: StatEventDetail[]; goalEvents: StatEventDetail[]; assistEvents: StatEventDetail[]; trainingEvents: StatEventDetail[] }>; totalMatches: number }) {
+function StatsTable({ rows, totalMatches, awardsByPlayer }: { rows: Array<{ player: Profile; appearances: number; goals: number; assists: number; participation: number | null; appearanceEvents: StatEventDetail[]; goalEvents: StatEventDetail[]; assistEvents: StatEventDetail[]; trainingEvents: StatEventDetail[] }>; totalMatches: number; awardsByPlayer: Record<string, StatAward[]> }) {
   const [sortKey, setSortKey] = useState<StatSortKey>("player");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [detail, setDetail] = useState<{ player: Profile; label: string; value: string; events: StatEventDetail[] } | null>(null);
   const bestGoals = Math.max(0, ...rows.map((row) => row.goals));
   const bestAssists = Math.max(0, ...rows.map((row) => row.assists));
+  const appearanceRateFor = (row: typeof rows[number]) => totalMatches ? Math.round((row.appearances / totalMatches) * 100) : null;
+  const bestAppearanceRate = Math.max(0, ...rows.map((row) => appearanceRateFor(row) ?? 0));
+  const bestTrainingRate = Math.max(0, ...rows.map((row) => row.participation ?? 0));
   const rateStatus = (value: number | null) => value === null ? "neutral" : value >= 80 ? "good" : value >= 60 ? "average" : "critical";
   const changeSort = (key: StatSortKey) => {
     if (key === sortKey) setSortDirection((direction) => direction === "asc" ? "desc" : "asc");
@@ -909,11 +978,12 @@ function StatsTable({ rows, totalMatches }: { rows: Array<{ player: Profile; app
     return result === 0 ? left.player.firstName.localeCompare(right.player.firstName, "de") : sortDirection === "asc" ? result : -result;
   });
   const header = (key: StatSortKey, label: string) => <th aria-sort={sortKey === key ? sortDirection === "asc" ? "ascending" : "descending" : "none"}><button type="button" className={`stats-sort-button${sortKey === key ? " active" : ""}`} onClick={() => changeSort(key)}>{label}<span aria-hidden="true">{sortKey === key ? sortDirection === "asc" ? "↑" : "↓" : "↕"}</span></button></th>;
-  return <><table className="stats-table"><thead><tr>{header("player", "Spieler:in")}{header("appearances", "Einsätze")}{header("goals", "Tore")}{header("assists", "Assists")}{header("training", "Training")}</tr></thead><tbody>{sortedRows.map((row) => {
-    const appearanceRate = totalMatches ? Math.round((row.appearances / totalMatches) * 100) : null;
+  return <><table className="stats-table"><thead><tr>{header("player", "Spieler:in")}{header("appearances", "Einsätze")}{header("goals", "Tore")}{header("assists", "Assists")}{header("training", "Training")}<th className="stats-award-heading">Award</th></tr></thead><tbody>{sortedRows.map((row) => {
+    const appearanceRate = appearanceRateFor(row);
     const trainingStatus = rateStatus(row.participation);
     const appearanceStatus = rateStatus(appearanceRate);
-    return <tr key={row.player.id}><td><Image src={`/api/player-image?name=${encodeURIComponent(row.player.firstName)}`} alt="" width={36} height={36} unoptimized /><strong>{row.player.firstName}</strong></td><td><button type="button" className={`stat-value stats-value-button stat-${appearanceStatus}`} onClick={() => setDetail({ player: row.player, label: "Einsätze", value: appearanceRate === null ? "—" : `${appearanceRate}%`, events: row.appearanceEvents })} title={appearanceRate === null ? "Noch keine Spieltage erfasst" : `${appearanceRate}% Einsatzquote`}><i aria-hidden="true" />{appearanceRate === null ? "—" : `${appearanceRate}%`}</button></td><td><button type="button" className="stat-value stats-value-button" onClick={() => setDetail({ player: row.player, label: "Tore", value: String(row.goals), events: row.goalEvents })}>{row.goals}{bestGoals > 0 && row.goals === bestGoals && <span className="stat-crown" title="Beste Torschützin / bester Torschütze" aria-label="Beste Torschützin / bester Torschütze">👑</span>}</button></td><td><button type="button" className="stat-value stats-value-button" onClick={() => setDetail({ player: row.player, label: "Assists", value: String(row.assists), events: row.assistEvents })}>{row.assists}{bestAssists > 0 && row.assists === bestAssists && <span className="stat-crown" title="Beste Assistgeberin / bester Assistgeber" aria-label="Beste Assistgeberin / bester Assistgeber">👑</span>}</button></td><td><button type="button" className={`stat-value stats-value-button stat-${trainingStatus}`} onClick={() => setDetail({ player: row.player, label: "Training", value: row.participation === null ? "—" : `${row.participation}%`, events: row.trainingEvents })} title={row.participation === null ? "Noch keine Trainings erfasst" : `${row.participation}% Trainingsteilnahme`}><i aria-hidden="true" />{row.participation === null ? "—" : `${row.participation}%`}</button></td></tr>;
+    const awards = awardsByPlayer[row.player.id] ?? [];
+    return <tr key={row.player.id}><td><Image src={`/api/player-image?name=${encodeURIComponent(row.player.firstName)}`} alt="" width={36} height={36} unoptimized /><strong>{row.player.firstName}</strong></td><td><button type="button" className={`stat-value stats-value-button stat-${appearanceStatus}`} onClick={() => setDetail({ player: row.player, label: "Einsätze", value: appearanceRate === null ? "—" : `${appearanceRate}%`, events: row.appearanceEvents })} title={appearanceRate === null ? "Noch keine Spieltage erfasst" : `${appearanceRate}% Einsatzquote`}><i aria-hidden="true" />{appearanceRate === null ? "—" : `${appearanceRate}%`}{bestAppearanceRate > 0 && appearanceRate === bestAppearanceRate && <span className="stat-crown" title="Höchste Einsatzquote" aria-label="Höchste Einsatzquote">👑</span>}</button></td><td><button type="button" className="stat-value stats-value-button" onClick={() => setDetail({ player: row.player, label: "Tore", value: String(row.goals), events: row.goalEvents })}>{row.goals}{bestGoals > 0 && row.goals === bestGoals && <span className="stat-crown" title="Beste Torschützin / bester Torschütze" aria-label="Beste Torschützin / bester Torschütze">👑</span>}</button></td><td><button type="button" className="stat-value stats-value-button" onClick={() => setDetail({ player: row.player, label: "Assists", value: String(row.assists), events: row.assistEvents })}>{row.assists}{bestAssists > 0 && row.assists === bestAssists && <span className="stat-crown" title="Beste Assistgeberin / bester Assistgeber" aria-label="Beste Assistgeberin / bester Assistgeber">👑</span>}</button></td><td><button type="button" className={`stat-value stats-value-button stat-${trainingStatus}`} onClick={() => setDetail({ player: row.player, label: "Training", value: row.participation === null ? "—" : `${row.participation}%`, events: row.trainingEvents })} title={row.participation === null ? "Noch keine Trainings erfasst" : `${row.participation}% Trainingsteilnahme`}><i aria-hidden="true" />{row.participation === null ? "—" : `${row.participation}%`}{bestTrainingRate > 0 && row.participation === bestTrainingRate && <span className="stat-crown" title="Höchste Trainingsteilnahme" aria-label="Höchste Trainingsteilnahme">👑</span>}</button></td><td className="stats-award-cell">{awards.map((award) => <span key={award.kind} className={`stats-award stats-award-${award.kind}`} title={award.title} aria-label={`${award.label}. ${award.title}`}>{award.label}</span>)}</td></tr>;
   })}</tbody></table>{detail && <StatDetailsDialog {...detail} onClose={() => setDetail(null)} />}</>;
 }
 
