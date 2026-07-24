@@ -22,7 +22,9 @@ function classify(title: string, description: string): CalendarEventType {
   const value = `${title} ${description}`.toLocaleLowerCase("de-DE");
   if (value.includes("training")) return "training";
   if (/turnier|talentiade|cup|🏆/.test(value)) return "tournament";
-  if (/rundenspiel|testspiel|freundschaftsspiel|\bspiel\b|\bvs\.?\b/.test(value)) return "game";
+  // Bekannte externe Testspiel-Bezeichnung: Die Google-Kalender-Überschrift kann
+  // verkürzt sein und nur den Gegner enthalten.
+  if (/rundenspiel|testspiel|freundschaftsspiel|intersocca|\bspiel\b|\bvs\.?\b/.test(value)) return "game";
   return "other";
 }
 
@@ -45,7 +47,9 @@ function toRecord(event: any, start: any, end: any): CalendarEvent {
 export async function getCalendarEvents() {
   const response = await fetch(CALENDAR_URL, {
     headers: { accept: "text/calendar" },
-    next: { revalidate: 900 },
+    // Kalenderänderungen sollen im Traineralltag zeitnah erscheinen, ohne den
+    // öffentlichen Google-Feed bei jedem Seitenaufruf erneut abzurufen.
+    next: { revalidate: 120 },
   });
   if (!response.ok) throw new Error(`Kalender antwortet mit ${response.status}.`);
 
