@@ -64,6 +64,23 @@ type SaveOperation = { scope: string; key: string; value: unknown; expectedRevis
 type HistoryEntry = { id: number; scope: string; record_key: string; revision: number; changed_at: string; changed_by: string };
 
 const positionOptions = ["TW", "IV", "LV", "RV", "ZDM", "ZM", "LF", "RF", "ST"];
+const trainerQuotes = [
+  { text: "Zuerst braucht es Empathie für den Spieler, für den Menschen. Man muss verstehen, was er fühlt und wie er denkt.", author: "Joachim Löw" },
+  { text: "Spieler müssen dir zuerst als Mensch vertrauen, bevor sie dir als Trainer zuhören.", author: "Ange Postecoglou" },
+  { text: "Die Entwicklung junger Spieler gelingt besser in einer Umgebung, in der sie sich wohlfühlen und Freude am Spiel haben.", author: "Michael O’Neill" },
+  { text: "Das größte Geschenk für einen Trainer sind Respekt, Vertrauen und der Glaube seiner Spieler und seines Teams.", author: "Howard Wilkinson" },
+  { text: "Manche Spieler brauchen klare Führung, andere Vertrauen und Freiheit. Ein Trainer muss verstehen, wie jeder Einzelne lernt.", author: "Sabrina Wittmann" },
+  { text: "Aus einzelnen Persönlichkeiten eine Mannschaft zu formen, gelingt nicht ohne die menschliche Komponente.", author: "Ottmar Hitzfeld" },
+  { text: "Ein gutes Vermächtnis entsteht, wenn man eine Umgebung schafft, zu der sich alle zugehörig fühlen wollen.", author: "Jill Ellis" },
+  { text: "Schaffe eine Atmosphäre des Vertrauens. Die Menschen, mit denen du arbeitest, müssen wissen, woran sie bei dir sind.", author: "Dany Ryser" },
+  { text: "Der Job eines Trainers besteht darin, Kinder auf einer Reise des Lernens, Entdeckens und Spaßhabens zu begleiten.", author: "Kris Van Der Haegen" },
+  { text: "Die Entwicklung junger Spieler verläuft immer positiver in einer freundlichen Umgebung.", author: "Michael O’Neill" },
+  { text: "Ein Trainer muss Vertrauen aufbauen und den Spielern durch sein Verhalten beständig zeigen, dass er an sie glaubt.", author: "Arsène Wenger" },
+  { text: "Unser wichtigstes Ziel ist es, glücklichere und gesündere Menschen zu entwickeln.", author: "Maxwell Scherrer" },
+  { text: "Manchmal muss man die Kinder einfach Kinder sein lassen.", author: "Robbie Keane" },
+  { text: "Es geht um die Kinder, ihre Entwicklung und ihre Freude am Spiel.", author: "Pete Sturgess" },
+  { text: "Hilf mir, Freude daran zu haben. Hilf mir, zu lernen und mich zu entwickeln.", author: "John Orpress" },
+] as const;
 const calendarVisibleFrom = new Date("2026-07-07T00:00:00+02:00").getTime();
 // Die erste D1-Planungsphase beginnt mit dem ersten sichtbaren Termin,
 // nicht erst mit dem ersten Turnier. So zählen auch Testspiele ab 07.07. mit.
@@ -132,6 +149,7 @@ function eventLineupId(event: CalendarEvent) {
 
 export default function CoachingTool() {
   const [tab, setTab] = useState<Tab>("overview");
+  const [overviewQuote, setOverviewQuote] = useState<(typeof trainerQuotes)[number]>(trainerQuotes[0]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [state, setState] = useState<CoachingState>(emptyState);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -166,6 +184,11 @@ export default function CoachingTool() {
   const nextGame = upcoming.find((event) => event.type === "game" || event.type === "tournament");
   const matchdayEvent = selectedEvent && (selectedEvent.type === "game" || selectedEvent.type === "tournament") ? selectedEvent : nextGame;
   const matchdayLineupId = matchdayEvent ? eventLineupId(matchdayEvent) : null;
+
+  useEffect(() => {
+    if (tab !== "overview") return;
+    setOverviewQuote(trainerQuotes[Math.floor(Math.random() * trainerQuotes.length)]);
+  }, [tab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -568,7 +591,7 @@ export default function CoachingTool() {
           {tab === "overview" && (
             <section className="coach-view">
               <div className="view-heading">
-                <div><p className="section-index">SAISON 2026/27</p><h1>Alles im Blick.</h1><p>Termine, Kader, Anwesenheit und Entwicklung an einem Ort.</p></div>
+                <div><p className="section-index">SAISON 2026/27</p><h1>Alles im Blick.</h1><p className="overview-quote" key={overviewQuote.text} aria-live="polite"><span>„{overviewQuote.text}“</span><cite>— {overviewQuote.author}</cite></p></div>
                 <Image className="overview-claim" src="/brand/allez-tsg.png" alt="Allez TSG" width={270} height={65} unoptimized />
               </div>
               <div className="overview-grid">
