@@ -154,7 +154,7 @@ function eventLineupId(event: CalendarEvent) {
   return `event-${event.id.replace(/[^a-zA-Z0-9._:-]/g, "_").slice(0, 210)}`;
 }
 
-export default function CoachingTool() {
+export default function CoachingTool({ trainerName }: { trainerName: string }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [overviewQuote, setOverviewQuote] = useState<(typeof trainerQuotes)[number]>(trainerQuotes[0]);
   const [overviewQuoteVersion, setOverviewQuoteVersion] = useState(0);
@@ -652,6 +652,7 @@ export default function CoachingTool() {
         </nav>
         <div className="coach-header-actions">
           <span className={pendingSaves ? "saving active" : "saving"} aria-live="polite">{pendingSaves ? "Speichert …" : "Gespeichert"}</span>
+          <span className="trainer-identity" title={`Angemeldet als ${trainerName}`}>Angemeldet: {trainerName}</span>
           <button className="logout-button" type="button" onClick={logout}>Abmelden</button>
         </div>
       </header>
