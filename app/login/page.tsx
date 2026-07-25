@@ -14,10 +14,21 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch("/api/auth", { cache: "no-store" })
-      .then((response) => response.json())
-      .then((data) => setMode(data.mode === "password" ? "password" : "pin"))
-      .catch(() => setMode("pin"));
+    let active = true;
+    async function prepareLogin() {
+      // Ein expliziter Aufruf der Loginseite beendet eine eventuell noch offene
+      // Sitzung eines anderen Trainers, bevor ein neuer Zugang verwendet wird.
+      await fetch("/api/auth", { method: "DELETE" });
+      try {
+        const response = await fetch("/api/auth", { cache: "no-store" });
+        const data = await response.json() as { mode?: unknown };
+        if (active) setMode(data.mode === "password" ? "password" : "pin");
+      } catch {
+        if (active) setMode("pin");
+      }
+    }
+    void prepareLogin();
+    return () => { active = false; };
   }, []);
 
   async function login(event: FormEvent<HTMLFormElement>) {
