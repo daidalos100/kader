@@ -378,7 +378,7 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .view-heading h1 { max-width: 900px; margin: 9px 0 10px; font-size: clamp(3rem, 8vw, 7.6rem); line-height: .82; letter-spacing: -.065em; text-transform: uppercase; }
 .view-heading.compact h1 { font-size: clamp(3rem, 6.5vw, 6.2rem); }
 .view-heading p:last-child { max-width: 690px; margin: 0; color: #aaa; line-height: 1.6; }
-.overview-quote { max-width: 780px !important; color: #d9d9db !important; font-size: clamp(.82rem, 1.05vw, .98rem); font-style: italic; line-height: 1.48 !important; animation: overview-quote-reveal .85s cubic-bezier(.2,.8,.2,1) both; }
+.overview-quote { width: min(100%, 1080px); max-width: 100% !important; overflow: hidden; color: #d9d9db !important; font-size: clamp(.72rem, .9vw, .86rem); font-style: italic; line-height: 1.35 !important; text-overflow: ellipsis; white-space: nowrap; animation: overview-quote-reveal .85s cubic-bezier(.2,.8,.2,1) both; }
 .overview-quote > span { display: inline; }
 .overview-quote > cite { display: inline; margin-left: .28em; color: #f14b4f; font-size: .92em; font-style: normal; font-weight: 750; white-space: nowrap; }
 @keyframes overview-quote-reveal { from { clip-path: inset(0 100% 0 0); opacity: 0; transform: translateX(-12px); } to { clip-path: inset(0 0 0 0); opacity: 1; transform: translateX(0); } }
