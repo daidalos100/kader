@@ -369,6 +369,7 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .coach-header nav button:hover, .coach-header nav button.active { color: var(--white); }
 .coach-header nav button.active::after { background: var(--red); }
 .coach-header-actions { display: flex; align-items: center; gap: 12px; }
+.trainer-identity { color: #cfd0d4; font-size: .61rem; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
 .saving { color: #777980; font-size: .61rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .saving::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 7px; border-radius: 50%; background: #55ce75; }
 .saving.active::before { background: #f5b640; animation: pulse 1s infinite; }
@@ -768,6 +769,7 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
   .coach-shell { padding-right: max(12px, env(safe-area-inset-right)); padding-left: max(12px, env(safe-area-inset-left)); }
   .coach-header { position: relative; gap: 10px; min-height: 0; }
   .coach-header-actions .saving { display: none; }
+  .trainer-identity { max-width: 104px; overflow: hidden; font-size: .56rem; text-overflow: ellipsis; }
   .coach-header nav { gap: 0; }
   .coach-header nav button { flex: 0 0 auto; padding-inline: 11px; }
   .coach-view { padding-top: 34px; }
