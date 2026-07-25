@@ -883,3 +883,29 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
   .tactics-workspace.presenting .tactics-scenarios { margin-inline: -8px; padding-inline: 8px; }
   .tactics-workspace.presenting .tactics-pitch { height: calc(100dvh - 120px); min-height: 720px; }
 }
+
+
+/* Mobile: the document must end with its actual content. This prevents stale
+   viewport/min-height calculations from creating an empty scroll area. */
+@media (max-width: 820px) {
+  html,
+  body {
+    height: auto;
+    min-height: 0;
+  }
+
+  body {
+    overflow-y: auto;
+  }
+
+  .coach-shell {
+    height: auto;
+    min-height: 0 !important;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+
+  .coach-view {
+    min-height: 0;
+    padding-bottom: 0;
+  }
+}
