@@ -804,6 +804,11 @@ function historyLabel(entry: HistoryEntry) {
   return `${labels[entry.scope] ?? "Eintrag"}${subject ? ` · ${subject}` : ""}`;
 }
 
+function historyActorName(value: string) {
+  const firstName = value.trim().split(/\s+/)[0];
+  return firstName || "Trainer:in";
+}
+
 function HistoryPanel({ onRestored }: { onRestored: () => Promise<void> }) {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [open, setOpen] = useState(false);
@@ -861,7 +866,7 @@ function HistoryPanel({ onRestored }: { onRestored: () => Promise<void> }) {
       <div className="history-content-head"><h2>Letzte Änderungen</h2><a className="text-button" href="/api/backup" download>Backup herunterladen ↓</a></div>
       {error && <p className="coach-notice" role="status">{error}</p>}
       {loading ? <p className="history-empty" role="status">Verlauf wird geladen …</p> : !entries.length && !error ? <p className="history-empty">Noch keine Änderungen im neuen Verlauf.</p> : <ol className="history-list">
-        {entries.slice(0, 10).map((entry) => <li key={entry.id}><div><strong>{historyLabel(entry)}</strong><time dateTime={entry.changed_at}>{new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" }).format(new Date(entry.changed_at))}</time></div><button type="button" disabled={busy} onClick={() => void restore(entry)}>Rückgängig</button></li>)}
+        {entries.slice(0, 10).map((entry) => <li key={entry.id}><div><strong>{historyLabel(entry)}</strong><time dateTime={entry.changed_at}>{new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" }).format(new Date(entry.changed_at))} · {historyActorName(entry.changed_by ?? "")}</time></div><button type="button" disabled={busy} onClick={() => void restore(entry)}>Rückgängig</button></li>)}
       </ol>}
     </div>}
   </section>;
