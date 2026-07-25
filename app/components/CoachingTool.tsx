@@ -154,6 +154,15 @@ function eventLineupId(event: CalendarEvent) {
   return `event-${event.id.replace(/[^a-zA-Z0-9._:-]/g, "_").slice(0, 210)}`;
 }
 
+function overviewReferenceTime(now = new Date()) {
+  const reference = new Date(now);
+  const cutoff = new Date(now);
+  cutoff.setHours(21, 0, 0, 0);
+  reference.setHours(0, 0, 0, 0);
+  if (now.getTime() >= cutoff.getTime()) reference.setDate(reference.getDate() + 1);
+  return reference.getTime();
+}
+
 export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: { trainerName: string; trainerCanCorrectHistory: boolean }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [overviewQuote, setOverviewQuote] = useState<(typeof trainerQuotes)[number]>(trainerQuotes[0]);
@@ -172,13 +181,15 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
   const [positionFilter, setPositionFilter] = useState("all");
   const [eventLineups, setEventLineups] = useState<Record<string, SavedLineup>>({});
   const [editingCalendarEvent, setEditingCalendarEvent] = useState<CalendarEvent | null>(null);
-  const [referenceTime] = useState(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return today.getTime();
-  });
+  const [referenceTime, setReferenceTime] = useState(() => overviewReferenceTime());
   const calendarListRef = useRef<HTMLDivElement>(null);
   const mobileCalendarDetailRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const refreshReferenceTime = () => setReferenceTime(overviewReferenceTime());
+    const interval = window.setInterval(refreshReferenceTime, 60 * 1000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const profiles = useMemo(
     () => state.roster.map((name) => profileFor(name, state.profiles[playerId(name)])),

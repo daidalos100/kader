@@ -130,6 +130,13 @@ test("calendar keeps its chronology from 07.07.2026 and stores local event overr
   assert.ok(migration.includes("calendar_event"));
 });
 
+test("overview keeps a matchday active until 21:00 local time", async () => {
+  const component = await source("app/components/CoachingTool.tsx");
+  for (const marker of ["function overviewReferenceTime", "cutoff.setHours(21, 0, 0, 0)", "overviewReferenceTime()", "setInterval(refreshReferenceTime, 60 * 1000)"]) {
+    assert.ok(component.includes(marker), `missing ${marker}`);
+  }
+});
+
 test("diagnostic cards support imported metrics without embedding player data", async () => {
   const [component, route] = await Promise.all([
     source("app/components/CoachingTool.tsx"), source("app/api/coaching-state/route.ts"),
