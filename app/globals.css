@@ -398,15 +398,28 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .card-actions button, .primary-button { min-height: 46px; padding: 0 18px; border: 1px solid var(--red); background: var(--red); color: var(--white); font-size: .67rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
 .card-actions button.secondary { border-color: rgba(244,243,239,.26); background: transparent; }
 .overview-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; border: 1px solid rgba(244,243,239,.16); background: rgba(244,243,239,.16); }
-.overview-metrics article { display: flex; flex-direction: column; justify-content: end; min-height: 164px; padding: 24px; background: #101115; }
+.overview-metrics article { display: flex; flex-direction: column; justify-content: end; min-height: 184px; padding: 22px 24px; background: #101115; }
 .overview-metrics strong { font-size: clamp(2.3rem, 4vw, 4rem); line-height: 1; }
 .overview-metrics span { margin-top: 8px; color: #8f9197; font-size: .65rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .overview-metrics .metric-kicker { margin: 0 auto auto 0; color: var(--red); font-size: .58rem; font-weight: 900; letter-spacing: .14em; }
-.overview-metrics .metric-trend { font-size: .6em; vertical-align: .35em; }
+.metric-heading { display: flex; align-items: center; gap: 9px; margin-bottom: auto; }
+.metric-heading .metric-kicker { margin: 0; }
+.overview-metrics .metric-trend { font-size: 1.1rem; font-weight: 900; line-height: 1; }
 .metric-trend-up { color: #55ce75; }
 .metric-trend-down { color: #ef4444; }
 .metric-trend-stable { color: #e6b84c; }
-.overview-metrics .metric-lines { font-size: clamp(1rem, 1.6vw, 1.45rem); line-height: 1.45; }
+.metric-footer { display: grid; gap: 2px; margin-top: 12px; }
+.overview-metrics .metric-footer span { margin: 0; font-size: .58rem; }
+.overview-metrics .metric-footer span:last-child { color: #d1d2d5; }
+.metric-best-list, .metric-king-list { display: grid; gap: 5px; margin-top: 14px; }
+.metric-best-list span, .metric-king-list span { display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 7px; margin: 0; color: #d5d5d7; font-size: .7rem; font-weight: 700; letter-spacing: .015em; text-transform: none; }
+.metric-best-list b, .metric-king-list b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.metric-best-list strong, .metric-king-list strong { color: var(--white); font-size: .75rem; line-height: 1.15; letter-spacing: 0; white-space: nowrap; }
+.metric-king-list { gap: 4px; margin-top: 12px; }
+.metric-king-list span { grid-template-columns: 1fr auto; font-size: .68rem; }
+.metric-king-list strong { color: #8ee59f; }
+.overview-metrics .metric-context { margin-top: auto; font-size: .53rem; }
+.metric-season > strong { margin-top: auto; }
 .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-top: 64px; padding-bottom: 18px; border-bottom: 1px solid rgba(244,243,239,.15); }
 .section-heading h2 { margin: 4px 0 0; font-size: 2rem; text-transform: uppercase; }
 .text-button { padding: 8px 0; border: 0; background: transparent; color: #b6b7ba; font-size: .68rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
@@ -813,7 +826,11 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
   .coach-header nav button { padding: 11px 9px; font-size: .57rem; }
   .coach-header-actions .logout-button { padding: 8px; }
   .overview-metrics, .event-strip { grid-template-columns: 1fr 1fr; }
-  .overview-metrics article { min-height: 125px; padding: 17px; }
+  .overview-metrics article { min-height: 188px; padding: 16px; }
+  .metric-best-list, .metric-king-list { gap: 4px; margin-top: 10px; }
+  .metric-best-list span, .metric-king-list span { font-size: .61rem; gap: 5px; }
+  .metric-best-list strong, .metric-king-list strong { font-size: .66rem; }
+  .overview-metrics .metric-context { font-size: .49rem; }
   .event-strip { gap: 7px; }
   .event-card { min-height: 210px; padding: 15px; }
   .event-card h3 { font-size: .92rem; }

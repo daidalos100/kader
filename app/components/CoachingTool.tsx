@@ -621,8 +621,11 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
         return { player, rate: playerRecorded ? Math.round((playerPresent / playerRecorded) * 100) : null, present: playerPresent };
       });
       const rate = recorded ? Math.round((present / recorded) * 100) : null;
-      const best = Math.max(0, ...playerRates.map((entry) => entry.rate ?? 0));
-      return { rate, kings: playerRates.filter((entry) => best > 0 && entry.rate === best).sort((left, right) => right.present - left.present || left.player.firstName.localeCompare(right.player.firstName, "de")).slice(0, 3) };
+      const kings = playerRates
+        .filter((entry): entry is typeof entry & { rate: number } => entry.rate !== null)
+        .sort((left, right) => right.rate - left.rate || right.present - left.present || left.player.firstName.localeCompare(right.player.firstName, "de"))
+        .slice(0, 5);
+      return { rate, kings };
     };
     const current = calculate(now - 28 * day, now + 1);
     const previous = calculate(now - 56 * day, now - 28 * day);
@@ -634,15 +637,29 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
       const best = Math.max(0, ...statsRows.map((row) => row[key]));
       return best > 0 ? statsRows.filter((row) => row[key] === best).map((row) => row.player.firstName).join(", ") : "Noch offen";
     };
-    const dream = profiles.flatMap((player) => awardsByPlayer[player.id] ?? []).find((award) => award.kind === "dream-duo");
+    const dreamOwner = profiles.find((player) => (awardsByPlayer[player.id] ?? []).some((award) => award.kind === "dream-duo"));
+    const dream = dreamOwner ? (awardsByPlayer[dreamOwner.id] ?? []).find((award) => award.kind === "dream-duo") : undefined;
     const clean = profiles.flatMap((player) => awardsByPlayer[player.id] ?? []).find((award) => award.kind === "clean-sheet");
-    return { goals: top("goals"), assists: top("assists"), dream: dream?.label.replace("💫 Traumduo: ", "") ?? "Noch offen", clean: clean?.label ?? "Noch offen" };
+    const dreamPartner = dream?.label.replace("💫 Traumduo: ", "");
+    return {
+      goals: top("goals"),
+      assists: top("assists"),
+      dream: dreamOwner && dreamPartner ? `${dreamOwner.firstName} & ${dreamPartner}` : "Noch offen",
+      clean: clean?.label ?? "Noch offen",
+    };
   }, [awardsByPlayer, profiles, statsRows]);
   const playedMatchdays = useMemo(() => gameEvents.filter((event) => {
     if (new Date(event.start).getTime() > Date.now()) return false;
     const match = state.matches[event.id];
     return Boolean(match && (match.result.trim() || (match.goalEvents?.length ?? 0) > 0 || Object.keys(match.entries).length > 0));
   }).length, [gameEvents, state.matches]);
+  const recordedTrainingSessions = useMemo(() => calendarEvents.filter((event) => {
+    if (event.type !== "training" || new Date(event.start).getTime() > Date.now()) return false;
+    return profiles.some((player) => {
+      const status = state.attendance[event.id]?.[player.id];
+      return status === "present" || status === "excused" || status === "absent";
+    });
+  }).length, [calendarEvents, profiles, state.attendance]);
 
   const seasonStatBestByPlayer = useMemo(() => {
     const keys: SeasonStatKey[] = ["appearances", "training", "goals", "assists"];
@@ -735,10 +752,10 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
                   {nextGame ? <><span className="event-date">{formatDate(nextGame.start)}</span><h2>{nextGame.title}</h2><p>{nextGame.location || "Ort noch offen"}</p><div className="card-actions"><button onClick={() => openEvent(nextGame, "lineup")}>Kader planen</button><button className="secondary" onClick={() => openEvent(nextGame, "attendance")}>Teilnahme eintragen</button><button className="secondary" onClick={() => openEvent(nextGame, "matchday")}>Spieltag</button></div></> : <p>Aktuell ist kein Spiel eingetragen.</p>}
                 </article>
                 <div className="overview-metrics">
-                  <article><p className="metric-kicker">LETZTE 4 WOCHEN</p><strong>{overviewTraining.rate === null ? "—" : `${overviewTraining.rate}%`} <small className={`metric-trend metric-trend-${overviewTraining.trend === "↑" ? "up" : overviewTraining.trend === "↓" ? "down" : "stable"}`}>{overviewTraining.trend}</small></strong><span>Trainingsquote · Vormonat {overviewTraining.previousRate === null ? "—" : `${overviewTraining.previousRate}%`}</span></article>
-                  <article><p className="metric-kicker">BESTWERTE</p><strong className="metric-lines">⚽ {overviewBest.goals}<br />🅰️ {overviewBest.assists}<br />💫 {overviewBest.dream}<br />🛡️ {overviewBest.clean}</strong><span>Tore · Assists · Traumduo · Weiße Weste</span></article>
-                  <article><p className="metric-kicker">TRAININGSKÖNIGE</p><strong className="metric-lines">{overviewTraining.kings.length ? overviewTraining.kings.map((entry) => `${entry.player.firstName} ${entry.rate}%`).join(" · ") : "Noch offen"}</strong><span>höchste Quote im aktuellen Zeitraum</span></article>
-                  <article><p className="metric-kicker">SAISON SEIT 07.07.26</p><strong>{playedMatchdays}</strong><span>gespielte Spieltage</span></article>
+                  <article className="metric-training"><div className="metric-heading"><p className="metric-kicker">TRAININGSQUOTE</p><small className={`metric-trend metric-trend-${overviewTraining.trend === "↑" ? "up" : overviewTraining.trend === "↓" ? "down" : "stable"}`}>{overviewTraining.trend}</small></div><strong>{overviewTraining.rate === null ? "—" : `${overviewTraining.rate}%`}</strong><div className="metric-footer"><span>Letzter Monat</span><span>Vormonat: {overviewTraining.previousRate === null ? "—" : `${overviewTraining.previousRate}%`}</span></div></article>
+                  <article className="metric-best"><p className="metric-kicker">BESTWERTE</p><div className="metric-best-list"><span>⚽ <b>Tore</b><strong>{overviewBest.goals}</strong></span><span>🎯 <b>Assists</b><strong>{overviewBest.assists}</strong></span><span>🤝 <b>Traumduo</b><strong>{overviewBest.dream}</strong></span><span>🛡️ <b>Weiße Weste</b><strong>{overviewBest.clean}</strong></span></div></article>
+                  <article className="metric-kings"><p className="metric-kicker">TRAININGSKÖNIGE</p><div className="metric-king-list">{overviewTraining.kings.length ? overviewTraining.kings.map((entry, index) => <span key={entry.player.id}><b>{index + 1}. {entry.player.firstName}</b><strong>{entry.rate}%</strong></span>) : <span>Noch keine Teilnahme erfasst.</span>}</div><span className="metric-context">Beste Quote · letzte 4 Wochen</span></article>
+                  <article className="metric-season"><p className="metric-kicker">SAISON SEIT 07.07.26</p><strong>{playedMatchdays} / {recordedTrainingSessions}</strong><span>Spieltage / Trainings</span></article>
                 </div>
               </div>
               <div className="section-heading"><div><p className="section-index">DIE NÄCHSTEN TERMINE</p><h2>Kalender</h2></div><button className="text-button" onClick={() => setTab("calendar")}>Alle anzeigen →</button></div>
