@@ -30,13 +30,38 @@ export async function GET() {
 
 export async function POST(request: Request) {
   if (!(await isAuthenticated())) return privateJson({ error: "Nicht angemeldet." }, { status: 401 });
-  const actor = (await currentTrainer())?.name ?? "trainer";
-  const body = (await request.json().catch(() => null)) as { historyId?: unknown } | null;
+  const trainer = await currentTrainer();
+  const actor = trainer?.name ?? "trainer";
+  const body = (await request.json().catch(() => null)) as { historyId?: unknown; action?: unknown } | null;
+  const { url, key } = await getSupabaseConfig();
+  if (!url || !key) return privateJson({ error: "Supabase ist nicht verbunden." }, { status: 503 });
+  if (body?.action === "reassign_legacy_julia") {
+    if (trainer?.role !== "admin") return privateJson({ error: "Nur der Admin darf den Verlauf korrigieren." }, { status: 403 });
+    const filters = new URLSearchParams({
+      season_id: `eq.${SEASON_ID}`,
+      changed_by: "eq.Frank",
+      scope: "in.(tactic,match_meta,match_entry)",
+      // Ausschließlich die vor der Login-Korrektur am 25.07. vorhandenen Einträge.
+      changed_at: "lt.2026-07-24T22:00:00.000Z",
+    });
+    try {
+      const response = await fetch(`${url}/rest/v1/coaching_history?${filters.toString()}`, {
+        method: "PATCH",
+        headers: supabaseHeaders(key, { prefer: "return=representation" }),
+        cache: "no-store",
+        body: JSON.stringify({ changed_by: "Julia" }),
+      });
+      if (!response.ok) throw new Error(`Supabase ${response.status}`);
+      const corrected = (await response.json().catch(() => [])) as unknown[];
+      return privateJson({ corrected: corrected.length });
+    } catch (error) {
+      console.error("history_reassign_failed", { message: error instanceof Error ? error.message : "unknown" });
+      return privateJson({ error: "Die bisherigen Einträge konnten nicht zugeordnet werden." }, { status: 502 });
+    }
+  }
   if (!body || !Number.isSafeInteger(body.historyId) || Number(body.historyId) < 1) {
     return privateJson({ error: "Ungültiger Verlaufseintrag." }, { status: 400 });
   }
-  const { url, key } = await getSupabaseConfig();
-  if (!url || !key) return privateJson({ error: "Supabase ist nicht verbunden." }, { status: 503 });
   try {
     const response = await fetch(`${url}/rest/v1/rpc/restore_coaching_history`, {
       method: "POST",
