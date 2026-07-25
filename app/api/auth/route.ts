@@ -1,5 +1,5 @@
 import {
-  anonymousClientHash, authMode, createPinSession, createTrainerSession, pinIsValid, sessionCookieName,
+  anonymousClientHash, authMode, createPinSession, createTrainerSession, currentTrainer, pinIsValid, sessionCookieName,
   sessionMaxAgeSeconds, trainerForLogin,
 } from "../../auth";
 import { getSupabaseConfig, supabaseHeaders } from "../../lib/supabase";
@@ -15,6 +15,10 @@ function privateJson(value: unknown, init: ResponseInit = {}) {
 
 function sessionResponse() {
   return `Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${sessionMaxAgeSeconds}`;
+}
+
+function clearSessionResponse() {
+  return `${sessionCookieName}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
 }
 
 function memoryRateLimit(clientHash: string, success: boolean) {
@@ -98,7 +102,8 @@ async function finishPasswordLogin(login: string, password: string) {
 }
 
 export async function GET() {
-  return privateJson({ mode: await authMode() });
+  const trainer = await currentTrainer();
+  return privateJson({ mode: await authMode(), trainer: trainer ? { name: trainer.name, role: trainer.role } : null });
 }
 
 export async function POST(request: Request) {
@@ -111,8 +116,8 @@ export async function POST(request: Request) {
     const password = typeof body?.password === "string" ? body.password : "";
     const trainer = await finishPasswordLogin(login, password);
     const rate = await consumeAttempt(clientHash, Boolean(trainer));
-    if (!rate.allowed) return privateJson({ error: "Zu viele Versuche. Bitte später erneut versuchen." }, { status: 429, headers: { "retry-after": String(Math.max(1, rate.retryAfter)) } });
-    if (!trainer) return privateJson({ error: "Benutzername oder Passwort ist nicht korrekt." }, { status: 401 });
+    if (!rate.allowed) return privateJson({ error: "Zu viele Versuche. Bitte später erneut versuchen." }, { status: 429, headers: { "retry-after": String(Math.max(1, rate.retryAfter)), "set-cookie": clearSessionResponse() } });
+    if (!trainer) return privateJson({ error: "Benutzername oder Passwort ist nicht korrekt." }, { status: 401, headers: { "set-cookie": clearSessionResponse() } });
     const session = await createTrainerSession(trainer);
     if (!session) return privateJson({ error: "Zugang ist noch nicht vollständig konfiguriert." }, { status: 503 });
     return privateJson(
@@ -137,6 +142,6 @@ export async function POST(request: Request) {
 export async function DELETE() {
   return privateJson(
     { authorized: false },
-    { headers: { "set-cookie": `${sessionCookieName}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0` } },
+    { headers: { "set-cookie": clearSessionResponse() } },
   );
 }
