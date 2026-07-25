@@ -402,9 +402,7 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .overview-metrics strong { font-size: clamp(2.3rem, 4vw, 4rem); line-height: 1; }
 .overview-metrics span { margin-top: 8px; color: #8f9197; font-size: .65rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .overview-metrics .metric-kicker { margin: 0 auto auto 0; color: var(--red); font-size: .58rem; font-weight: 900; letter-spacing: .14em; }
-.metric-heading { display: flex; align-items: center; gap: 9px; margin-bottom: auto; }
-.metric-heading .metric-kicker { margin: 0; }
-.overview-metrics .metric-trend { font-size: 1.1rem; font-weight: 900; line-height: 1; }
+.overview-metrics .metric-trend { display: inline-block; margin-left: .1em; font-size: .5em; font-weight: 900; line-height: 1; vertical-align: .28em; }
 .metric-trend-up { color: #55ce75; }
 .metric-trend-down { color: #ef4444; }
 .metric-trend-stable { color: #e6b84c; }
@@ -412,9 +410,11 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .overview-metrics .metric-footer span { margin: 0; font-size: .58rem; }
 .overview-metrics .metric-footer span:last-child { color: #d1d2d5; }
 .metric-best-list, .metric-king-list { display: grid; gap: 5px; margin-top: 14px; }
-.metric-best-list span, .metric-king-list span { display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 7px; margin: 0; color: #d5d5d7; font-size: .7rem; font-weight: 700; letter-spacing: .015em; text-transform: none; }
+.metric-best-list span, .metric-king-list span { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 7px; margin: 0; color: #d5d5d7; font-size: .7rem; font-weight: 700; letter-spacing: .015em; text-transform: none; }
 .metric-best-list b, .metric-king-list b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .metric-best-list strong, .metric-king-list strong { color: var(--white); font-size: .75rem; line-height: 1.15; letter-spacing: 0; white-space: nowrap; }
+.metric-best-list span { grid-template-columns: auto minmax(0, 1fr); font-size: .78rem; }
+.metric-best-list strong { overflow: hidden; text-overflow: ellipsis; font-size: .84rem; }
 .metric-king-list { gap: 4px; margin-top: 12px; }
 .metric-king-list span { grid-template-columns: 1fr auto; font-size: .68rem; }
 .metric-king-list strong { color: #8ee59f; }
