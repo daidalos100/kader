@@ -173,7 +173,11 @@ export default function CoachingTool() {
   const [matchdayLineup, setMatchdayLineup] = useState<MatchdayLineupPlayer[]>([]);
   const [eventLineups, setEventLineups] = useState<Record<string, SavedLineup>>({});
   const [editingCalendarEvent, setEditingCalendarEvent] = useState<CalendarEvent | null>(null);
-  const [referenceTime] = useState(() => Date.now());
+  const [referenceTime] = useState(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today.getTime();
+  });
   const calendarListRef = useRef<HTMLDivElement>(null);
   const mobileCalendarDetailRef = useRef<HTMLDivElement>(null);
 
