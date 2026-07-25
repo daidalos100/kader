@@ -88,6 +88,14 @@ test("matchday capture records and reverses scorer and assist together", async (
   assert.ok(route.includes("goalEvents"));
 });
 
+test("matchday capture offers every present player, independent of the lineup", async () => {
+  const component = await source("app/components/CoachingTool.tsx");
+  for (const marker of ["matchdayAvailablePlayers", 'attendance[player.id] === "present"', "Teilnahme laden", "Spieltag erfassen"]) {
+    assert.ok(component.includes(marker), `missing ${marker}`);
+  }
+  assert.ok(!component.includes("Aufstellung noch nicht vorhanden."));
+});
+
 test("appearances are derived from saved matchday lineups", async () => {
   const [component, route] = await Promise.all([
     source("app/components/CoachingTool.tsx"), source("app/api/lineup/route.ts"),

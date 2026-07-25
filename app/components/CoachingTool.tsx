@@ -170,7 +170,6 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
   const [notice, setNotice] = useState("");
   const [newRosterName, setNewRosterName] = useState("");
   const [positionFilter, setPositionFilter] = useState("all");
-  const [matchdayLineup, setMatchdayLineup] = useState<MatchdayLineupPlayer[]>([]);
   const [eventLineups, setEventLineups] = useState<Record<string, SavedLineup>>({});
   const [editingCalendarEvent, setEditingCalendarEvent] = useState<CalendarEvent | null>(null);
   const [referenceTime] = useState(() => {
@@ -195,37 +194,26 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
   const nextEvents = upcoming.slice(0, 4);
   const nextGame = upcoming.find((event) => event.type === "game" || event.type === "tournament");
   const matchdayEvent = selectedEvent && (selectedEvent.type === "game" || selectedEvent.type === "tournament") ? selectedEvent : nextGame;
-  const matchdayLineupId = matchdayEvent ? eventLineupId(matchdayEvent) : null;
+  const matchdayAvailablePlayers = useMemo(() => {
+    if (!matchdayEvent) return [] as MatchdayLineupPlayer[];
+    const positionRank = ["ST", "LF", "RF", "ZM", "ZDM", "LV", "IV", "RV", "TW"];
+    const attendance = state.attendance[matchdayEvent.id] ?? {};
+    return profiles
+      .filter((player) => attendance[player.id] === "present")
+      .sort((left, right) => {
+        const leftRank = positionRank.indexOf(left.primaryPosition.toUpperCase());
+        const rightRank = positionRank.indexOf(right.primaryPosition.toUpperCase());
+        const rankDifference = (leftRank < 0 ? positionRank.length : leftRank) - (rightRank < 0 ? positionRank.length : rightRank);
+        return rankDifference || left.firstName.localeCompare(right.firstName, "de");
+      })
+      .map((player) => ({ player, position: player.primaryPosition || "—" }));
+  }, [matchdayEvent, profiles, state.attendance]);
 
   useEffect(() => {
     if (tab !== "overview") return;
     setOverviewQuote(trainerQuotes[Math.floor(Math.random() * trainerQuotes.length)]);
     setOverviewQuoteVersion((current) => current + 1);
   }, [tab]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!matchdayLineupId) return;
-    fetch(`/api/lineup?lineupId=${encodeURIComponent(matchdayLineupId)}`, { cache: "no-store" })
-      .then(async (response) => response.ok ? await response.json() as { lineup?: SavedLineup } : { lineup: {} })
-      .then((data) => {
-        if (cancelled) return;
-        const rank = ["st", "lf", "rf", "zm", "zdm", "lv", "iv", "rv", "tw"];
-        const used = new Set<string>();
-        const lineup = Object.entries(data.lineup ?? {})
-          .sort(([left], [right]) => (rank.indexOf(left.toLowerCase()) + rank.length) % rank.length - (rank.indexOf(right.toLowerCase()) + rank.length) % rank.length)
-          .flatMap(([position, players]) => players.map((item) => ({ position: position.toUpperCase(), name: item.firstName?.trim() ?? "" })))
-          .flatMap(({ position, name }) => {
-            const player = profiles.find((item) => item.firstName.localeCompare(name, "de", { sensitivity: "base" }) === 0);
-            if (!player || used.has(player.id)) return [];
-            used.add(player.id);
-            return [{ player, position }];
-          });
-        setMatchdayLineup(lineup);
-      })
-      .catch(() => { if (!cancelled) setMatchdayLineup([]); });
-    return () => { cancelled = true; };
-  }, [matchdayLineupId, profiles]);
 
   useEffect(() => {
     let cancelled = false;
@@ -724,7 +712,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
             <section className="coach-view matchday-view">
               <MatchdayPanel key={matchdayEvent?.id ?? "no-match"}
                 event={matchdayEvent ?? null}
-                lineup={matchdayLineup}
+                lineup={matchdayAvailablePlayers}
                 profiles={profiles}
                 data={matchdayEvent ? state.matches[matchdayEvent.id] ?? { result: "", entries: {}, goalEvents: [] } : null}
                 onChooseEvent={(event) => setSelectedEvent(event)}
@@ -1065,7 +1053,7 @@ function MatchdayPanel({ event, events, lineup, profiles, data, onChooseEvent, o
     setSaving(false);
   }
   const goalEvents = [...(data?.goalEvents ?? [])].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-  return <><div className="matchday-heading"><div><p className="section-index">LIVE-ERFASSUNG</p><h1>Spieltag.</h1><p>{event ? `${event.title} · ${formatDate(event.start, false)}` : "Spiel auswählen und die Aufstellung laden."}</p></div><div className="matchday-heading-actions"><label>Spiel<select value={event?.id ?? ""} onChange={(change) => { const next = events.find((item) => item.id === change.target.value); if (next) onChooseEvent(next); }}><option value="">Spiel wählen</option>{events.map((item) => <option key={item.id} value={item.id}>{formatDate(item.start, false)} · {item.title}</option>)}</select></label><button type="button" className="matchday-focus-button" onClick={() => setFocusMode((active) => !active)}>{focusMode ? "Fokus schließen" : "Fokusmodus"}</button></div></div>{!event ? <div className="matchday-empty"><strong>Kein Spiel ausgewählt.</strong><p>Über Kalender oder Auswahl oben den Spieltag öffnen.</p></div> : !players.length ? <div className="matchday-empty"><strong>Aufstellung noch nicht vorhanden.</strong><p>Bitte zuerst den Kader für dieses Spiel in der Aufstellung festlegen.</p></div> : <div className="matchday-layout"><section className="matchday-capture"><div className={`matchday-step ${step}`}><p className="section-index">{step === "start" ? "TORE UND ASSISTS EINGEBEN" : step === "scorer" ? "TOR ERFASSEN" : "ASSIST ERFASSEN"}</p>{step !== "start" && <h2>{step === "scorer" ? "Torschütze wählen" : "Assist wählen"}</h2>}{step === "start" ? <><button className="matchday-start" type="button" onClick={() => setStep("scorer")}>TOR ERFASSEN</button><label className="matchday-result">Ergebnis<input defaultValue={data?.result ?? ""} onBlur={(input) => onResult(input.target.value.trim().slice(0, 20))} placeholder="z. B. 3:1" /></label></> : <><div className="matchday-player-grid">{players.filter((item) => step !== "assist" || item.player.id !== scorerId).map((item) => <button className="matchday-player-button" type="button" disabled={saving} key={item.player.id} onClick={() => step === "scorer" ? chooseScorer(item.player.id) : completeGoal(item.player.id)}><Image src={`/api/player-image?name=${encodeURIComponent(item.player.firstName)}&v=20260723`} alt="" width={96} height={96} unoptimized /><span>{item.player.firstName}</span><small>{item.position}</small></button>)}</div>{step === "assist" && <div className="matchday-actions"><button className="matchday-no-assist" type="button" disabled={saving} onClick={() => completeGoal(null)}>OHNE ASSIST</button><button className="text-button" type="button" disabled={saving} onClick={() => { setScorerId(null); setStep("scorer"); }}>Zurück</button></div>}</>}</div></section><aside className="matchday-history"><p className="section-index">ERFASSTE TORE</p><h2>{goalEvents.length}</h2>{goalEvents.length ? <div>{goalEvents.map((goal) => <article key={goal.id}><p><strong>{nameFor(goal.scorerId)}</strong><span>{goal.assistId ? `Assist: ${nameFor(goal.assistId)}` : "ohne Assist"}</span></p><button type="button" disabled={saving} onClick={() => undo(goal)}>Rückgängig</button></article>)}</div> : <p>Noch kein Tor erfasst.</p>}</aside></div>}</>;
+  return <><div className="matchday-heading"><div><p className="section-index">LIVE-ERFASSUNG</p><h1>Spieltag.</h1><p>{event ? `${event.title} · ${formatDate(event.start, false)}` : "Spiel auswählen und die Teilnahme laden."}</p></div><div className="matchday-heading-actions"><label>Spiel<select value={event?.id ?? ""} onChange={(change) => { const next = events.find((item) => item.id === change.target.value); if (next) onChooseEvent(next); }}><option value="">Spiel wählen</option>{events.map((item) => <option key={item.id} value={item.id}>{formatDate(item.start, false)} · {item.title}</option>)}</select></label><button type="button" className="matchday-focus-button" onClick={() => setFocusMode((active) => !active)}>{focusMode ? "Fokus schließen" : "Fokusmodus"}</button></div></div>{!event ? <div className="matchday-empty"><strong>Kein Spiel ausgewählt.</strong><p>Über Kalender oder Auswahl oben den Spieltag öffnen.</p></div> : !players.length ? <div className="matchday-empty"><strong>Noch keine anwesenden Spieler:innen eingetragen.</strong><p>Bitte zuerst die Teilnahme für diesen Spieltag erfassen.</p></div> : <div className="matchday-layout"><section className="matchday-capture"><div className={`matchday-step ${step}`}><p className="section-index">{step === "start" ? "TORE UND ASSISTS EINGEBEN" : step === "scorer" ? "TOR ERFASSEN" : "ASSIST ERFASSEN"}</p>{step !== "start" && <h2>{step === "scorer" ? "Torschütze wählen" : "Assist wählen"}</h2>}{step === "start" ? <><button className="matchday-start" type="button" onClick={() => setStep("scorer")}>TOR ERFASSEN</button><label className="matchday-result">Ergebnis<input defaultValue={data?.result ?? ""} onBlur={(input) => onResult(input.target.value.trim().slice(0, 20))} placeholder="z. B. 3:1" /></label></> : <><div className="matchday-player-grid">{players.filter((item) => step !== "assist" || item.player.id !== scorerId).map((item) => <button className="matchday-player-button" type="button" disabled={saving} key={item.player.id} onClick={() => step === "scorer" ? chooseScorer(item.player.id) : completeGoal(item.player.id)}><Image src={`/api/player-image?name=${encodeURIComponent(item.player.firstName)}&v=20260723`} alt="" width={96} height={96} unoptimized /><span>{item.player.firstName}</span><small>{item.position}</small></button>)}</div>{step === "assist" && <div className="matchday-actions"><button className="matchday-no-assist" type="button" disabled={saving} onClick={() => completeGoal(null)}>OHNE ASSIST</button><button className="text-button" type="button" disabled={saving} onClick={() => { setScorerId(null); setStep("scorer"); }}>Zurück</button></div>}</>}</div></section><aside className="matchday-history"><p className="section-index">ERFASSTE TORE</p><h2>{goalEvents.length}</h2>{goalEvents.length ? <div>{goalEvents.map((goal) => <article key={goal.id}><p><strong>{nameFor(goal.scorerId)}</strong><span>{goal.assistId ? `Assist: ${nameFor(goal.assistId)}` : "ohne Assist"}</span></p><button type="button" disabled={saving} onClick={() => undo(goal)}>Rückgängig</button></article>)}</div> : <p>Noch kein Tor erfasst.</p>}</aside></div>}</>;
 }
 
 function ProfileDialog({ profile, onClose, onSubmit }: { profile: Profile; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
