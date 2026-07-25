@@ -1058,8 +1058,9 @@ function DiagnosticDetailRecord({ diagnostic, previous, bestDisciplineKeys }: { 
 }
 
 function StatsTable({ rows, totalMatches, awardsByPlayer }: { rows: Array<{ player: Profile; appearances: number; goals: number; assists: number; participation: number | null; appearanceEvents: StatEventDetail[]; goalEvents: StatEventDetail[]; assistEvents: StatEventDetail[]; trainingEvents: StatEventDetail[] }>; totalMatches: number; awardsByPlayer: Record<string, StatAward[]> }) {
-  const [sortKey, setSortKey] = useState<StatSortKey>("player");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [sortKey, setSortKey] = useState<StatSortKey>("training");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [defaultSort, setDefaultSort] = useState(true);
   const [detail, setDetail] = useState<{ player: Profile; label: string; value: string; events: StatEventDetail[] } | null>(null);
   const bestGoals = Math.max(0, ...rows.map((row) => row.goals));
   const bestAssists = Math.max(0, ...rows.map((row) => row.assists));
@@ -1068,10 +1069,22 @@ function StatsTable({ rows, totalMatches, awardsByPlayer }: { rows: Array<{ play
   const bestTrainingRate = Math.max(0, ...rows.map((row) => row.participation ?? 0));
   const rateStatus = (value: number | null) => value === null ? "neutral" : value >= 80 ? "good" : value >= 60 ? "average" : "critical";
   const changeSort = (key: StatSortKey) => {
+    setDefaultSort(false);
     if (key === sortKey) setSortDirection((direction) => direction === "asc" ? "desc" : "asc");
     else { setSortKey(key); setSortDirection(key === "player" ? "asc" : "desc"); }
   };
   const sortedRows = [...rows].sort((left, right) => {
+    if (defaultSort) {
+      const trainingDifference = (right.participation ?? -1) - (left.participation ?? -1);
+      if (trainingDifference) return trainingDifference;
+      const appearanceDifference = (appearanceRateFor(right) ?? -1) - (appearanceRateFor(left) ?? -1);
+      if (appearanceDifference) return appearanceDifference;
+      const goalDifference = right.goals - left.goals;
+      if (goalDifference) return goalDifference;
+      const assistDifference = right.assists - left.assists;
+      if (assistDifference) return assistDifference;
+      return left.player.firstName.localeCompare(right.player.firstName, "de");
+    }
     const leftValue = sortKey === "player" ? left.player.firstName : sortKey === "training" ? left.participation ?? -1 : left[sortKey];
     const rightValue = sortKey === "player" ? right.player.firstName : sortKey === "training" ? right.participation ?? -1 : right[sortKey];
     const result = typeof leftValue === "string" && typeof rightValue === "string" ? leftValue.localeCompare(rightValue, "de") : Number(leftValue) - Number(rightValue);
