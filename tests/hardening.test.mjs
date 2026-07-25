@@ -79,13 +79,23 @@ test("tactics stay draggable, tied to lineups and support custom scenarios", asy
 });
 
 test("matchday capture records and reverses scorer and assist together", async () => {
-  const [component, route] = await Promise.all([
-    source("app/components/CoachingTool.tsx"), source("app/api/coaching-state/route.ts"),
+  const [component, route, historyRoute] = await Promise.all([
+    source("app/components/CoachingTool.tsx"), source("app/api/coaching-state/route.ts"), source("app/api/history/route.ts"),
   ]);
   for (const marker of ["MatchdayPanel", "TOR ERFASSEN", "OHNE ASSIST", "Rückgängig", "goalEvents", "recordGoal", "undoGoal"]) {
     assert.ok(component.includes(marker), `missing ${marker}`);
   }
   assert.ok(route.includes("goalEvents"));
+  assert.ok(component.includes("restore_match_goal_events"));
+  assert.ok(component.includes("Tore aus Verlauf wiederherstellen"));
+  assert.ok(historyRoute.includes("restore_match_goal_events"));
+  assert.ok(historyRoute.includes("goalEventsFrom"));
+  assert.ok(historyRoute.includes("Torverlauf wiederhergestellt"));
+});
+
+test("saving a result preserves the individual goal events", async () => {
+  const component = await source("app/components/CoachingTool.tsx");
+  assert.ok(component.includes('operation("match_meta", eventId, { result: next.result, goalEvents: next.goalEvents ?? [] })'));
 });
 
 test("matchday capture offers every present player, independent of the lineup", async () => {

@@ -382,12 +382,31 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
   }
 
   function updateMatch(eventId: string, patch: Partial<MatchData>) {
-    const current = state.matches[eventId] ?? { result: "", entries: {} };
+    const current = state.matches[eventId] ?? { result: "", entries: {}, goalEvents: [] };
     const next = { ...current, ...patch };
     void save(
       { ...state, matches: { ...state.matches, [eventId]: next } },
-      [operation("match_meta", eventId, { result: next.result })],
+      [operation("match_meta", eventId, { result: next.result, goalEvents: next.goalEvents ?? [] })],
     );
+  }
+
+  async function restoreMatchGoalEvents(eventId: string) {
+    setNotice("");
+    try {
+      const response = await fetch("/api/history", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "restore_match_goal_events", eventId }),
+      });
+      const data = await response.json() as { error?: string; restoredGoals?: number };
+      if (!response.ok) throw new Error(data.error ?? "Tore konnten nicht wiederhergestellt werden.");
+      await refreshCoachingState();
+      setNotice(`${data.restoredGoals ?? 0} Tore aus dem Verlauf wiederhergestellt.`);
+      return true;
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Tore konnten nicht wiederhergestellt werden.");
+      return false;
+    }
   }
 
     async function recordGoal(eventId: string, scorerId: string, assistId: string | null) {
@@ -720,6 +739,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
                 onGoal={recordGoal}
                 onUndo={undoGoal}
                 onResult={(result) => matchdayEvent && updateMatch(matchdayEvent.id, { result })}
+                onRestoreGoalEvents={restoreMatchGoalEvents}
               />
             </section>
           )}
@@ -1027,7 +1047,7 @@ function StatDetailsDialog({ player, label, value, events, onClose }: { player: 
   return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="stat-details-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="coach-modal stat-details-dialog"><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">STATISTIK · DETAILS</p><h2 id="stat-details-title">{player.firstName} · {label}</h2><strong className="stat-details-value">{value}</strong>{events.length ? <ul>{events.map((event) => <li key={`${event.eventId}-${event.detail}`}><time>{event.date}</time><div><strong>{event.title}</strong><span>{event.detail}</span></div></li>)}</ul> : <p className="history-empty">Noch keine Einträge vorhanden.</p>}<div className="modal-actions"><button className="primary-button" type="button" onClick={onClose}>Schließen</button></div></section></div>;
 }
 
-function MatchdayPanel({ event, events, lineup, profiles, data, onChooseEvent, onGoal, onUndo, onResult }: { event: CalendarEvent | null; events: CalendarEvent[]; lineup: MatchdayLineupPlayer[]; profiles: Profile[]; data: MatchData | null; onChooseEvent: (event: CalendarEvent) => void; onGoal: (eventId: string, scorerId: string, assistId: string | null) => Promise<boolean>; onUndo: (eventId: string, goal: GoalEvent) => Promise<boolean>; onResult: (result: string) => void }) {
+function MatchdayPanel({ event, events, lineup, profiles, data, onChooseEvent, onGoal, onUndo, onResult, onRestoreGoalEvents }: { event: CalendarEvent | null; events: CalendarEvent[]; lineup: MatchdayLineupPlayer[]; profiles: Profile[]; data: MatchData | null; onChooseEvent: (event: CalendarEvent) => void; onGoal: (eventId: string, scorerId: string, assistId: string | null) => Promise<boolean>; onUndo: (eventId: string, goal: GoalEvent) => Promise<boolean>; onResult: (result: string) => void; onRestoreGoalEvents: (eventId: string) => Promise<boolean> }) {
   const [step, setStep] = useState<"start" | "scorer" | "assist">("start");
   const [scorerId, setScorerId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -1052,8 +1072,15 @@ function MatchdayPanel({ event, events, lineup, profiles, data, onChooseEvent, o
     await onUndo(event.id, goal);
     setSaving(false);
   }
+  async function restoreGoalEvents() {
+    if (!event || !window.confirm("Die einzelnen Tore und Assists werden aus dem geschützten Änderungsverlauf wiederhergestellt. Fortfahren?")) return;
+    setSaving(true);
+    await onRestoreGoalEvents(event.id);
+    setSaving(false);
+  }
   const goalEvents = [...(data?.goalEvents ?? [])].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-  return <><div className="matchday-heading"><div><p className="section-index">LIVE-ERFASSUNG</p><h1>Spieltag.</h1><p>{event ? `${event.title} · ${formatDate(event.start, false)}` : "Spiel auswählen und die Teilnahme laden."}</p></div><div className="matchday-heading-actions"><label>Spiel<select value={event?.id ?? ""} onChange={(change) => { const next = events.find((item) => item.id === change.target.value); if (next) onChooseEvent(next); }}><option value="">Spiel wählen</option>{events.map((item) => <option key={item.id} value={item.id}>{formatDate(item.start, false)} · {item.title}</option>)}</select></label><button type="button" className="matchday-focus-button" onClick={() => setFocusMode((active) => !active)}>{focusMode ? "Fokus schließen" : "Fokusmodus"}</button></div></div>{!event ? <div className="matchday-empty"><strong>Kein Spiel ausgewählt.</strong><p>Über Kalender oder Auswahl oben den Spieltag öffnen.</p></div> : !players.length ? <div className="matchday-empty"><strong>Noch keine anwesenden Spieler:innen eingetragen.</strong><p>Bitte zuerst die Teilnahme für diesen Spieltag erfassen.</p></div> : <div className="matchday-layout"><section className="matchday-capture"><div className={`matchday-step ${step}`}><p className="section-index">{step === "start" ? "TORE UND ASSISTS EINGEBEN" : step === "scorer" ? "TOR ERFASSEN" : "ASSIST ERFASSEN"}</p>{step !== "start" && <h2>{step === "scorer" ? "Torschütze wählen" : "Assist wählen"}</h2>}{step === "start" ? <><button className="matchday-start" type="button" onClick={() => setStep("scorer")}>TOR ERFASSEN</button><label className="matchday-result">Ergebnis<input defaultValue={data?.result ?? ""} onBlur={(input) => onResult(input.target.value.trim().slice(0, 20))} placeholder="z. B. 3:1" /></label></> : <><div className="matchday-player-grid">{players.filter((item) => step !== "assist" || item.player.id !== scorerId).map((item) => <button className="matchday-player-button" type="button" disabled={saving} key={item.player.id} onClick={() => step === "scorer" ? chooseScorer(item.player.id) : completeGoal(item.player.id)}><Image src={`/api/player-image?name=${encodeURIComponent(item.player.firstName)}&v=20260723`} alt="" width={96} height={96} unoptimized /><span>{item.player.firstName}</span><small>{item.position}</small></button>)}</div>{step === "assist" && <div className="matchday-actions"><button className="matchday-no-assist" type="button" disabled={saving} onClick={() => completeGoal(null)}>OHNE ASSIST</button><button className="text-button" type="button" disabled={saving} onClick={() => { setScorerId(null); setStep("scorer"); }}>Zurück</button></div>}</>}</div></section><aside className="matchday-history"><p className="section-index">ERFASSTE TORE</p><h2>{goalEvents.length}</h2>{goalEvents.length ? <div>{goalEvents.map((goal) => <article key={goal.id}><p><strong>{nameFor(goal.scorerId)}</strong><span>{goal.assistId ? `Assist: ${nameFor(goal.assistId)}` : "ohne Assist"}</span></p><button type="button" disabled={saving} onClick={() => undo(goal)}>Rückgängig</button></article>)}</div> : <p>Noch kein Tor erfasst.</p>}</aside></div>}</>;
+  const hasAggregateGoals = Object.values(data?.entries ?? {}).some((entry) => entry.goals > 0 || entry.assists > 0);
+  return <><div className="matchday-heading"><div><p className="section-index">LIVE-ERFASSUNG</p><h1>Spieltag.</h1><p>{event ? `${event.title} · ${formatDate(event.start, false)}` : "Spiel auswählen und die Teilnahme laden."}</p></div><div className="matchday-heading-actions"><label>Spiel<select value={event?.id ?? ""} onChange={(change) => { const next = events.find((item) => item.id === change.target.value); if (next) onChooseEvent(next); }}><option value="">Spiel wählen</option>{events.map((item) => <option key={item.id} value={item.id}>{formatDate(item.start, false)} · {item.title}</option>)}</select></label><button type="button" className="matchday-focus-button" onClick={() => setFocusMode((active) => !active)}>{focusMode ? "Fokus schließen" : "Fokusmodus"}</button></div></div>{!event ? <div className="matchday-empty"><strong>Kein Spiel ausgewählt.</strong><p>Über Kalender oder Auswahl oben den Spieltag öffnen.</p></div> : !players.length ? <div className="matchday-empty"><strong>Noch keine anwesenden Spieler:innen eingetragen.</strong><p>Bitte zuerst die Teilnahme für diesen Spieltag erfassen.</p></div> : <div className="matchday-layout"><section className="matchday-capture"><div className={`matchday-step ${step}`}><p className="section-index">{step === "start" ? "TORE UND ASSISTS EINGEBEN" : step === "scorer" ? "TOR ERFASSEN" : "ASSIST ERFASSEN"}</p>{step !== "start" && <h2>{step === "scorer" ? "Torschütze wählen" : "Assist wählen"}</h2>}{step === "start" ? <><button className="matchday-start" type="button" onClick={() => setStep("scorer")}>TOR ERFASSEN</button><label className="matchday-result">Ergebnis<input defaultValue={data?.result ?? ""} onBlur={(input) => onResult(input.target.value.trim().slice(0, 20))} placeholder="z. B. 3:1" /></label></> : <><div className="matchday-player-grid">{players.filter((item) => step !== "assist" || item.player.id !== scorerId).map((item) => <button className="matchday-player-button" type="button" disabled={saving} key={item.player.id} onClick={() => step === "scorer" ? chooseScorer(item.player.id) : completeGoal(item.player.id)}><Image src={`/api/player-image?name=${encodeURIComponent(item.player.firstName)}&v=20260723`} alt="" width={96} height={96} unoptimized /><span>{item.player.firstName}</span><small>{item.position}</small></button>)}</div>{step === "assist" && <div className="matchday-actions"><button className="matchday-no-assist" type="button" disabled={saving} onClick={() => completeGoal(null)}>OHNE ASSIST</button><button className="text-button" type="button" disabled={saving} onClick={() => { setScorerId(null); setStep("scorer"); }}>Zurück</button></div>}</>}</div></section><aside className="matchday-history"><p className="section-index">ERFASSTE TORE</p><h2>{goalEvents.length}</h2>{goalEvents.length ? <div>{goalEvents.map((goal) => <article key={goal.id}><p><strong>{nameFor(goal.scorerId)}</strong><span>{goal.assistId ? `Assist: ${nameFor(goal.assistId)}` : "ohne Assist"}</span></p><button type="button" disabled={saving} onClick={() => undo(goal)}>Rückgängig</button></article>)}</div> : <>{hasAggregateGoals ? <div className="matchday-recovery"><p>Die Statistik enthält bereits Tore oder Assists, die Einzelliste fehlt jedoch.</p><button type="button" className="text-button" disabled={saving} onClick={() => void restoreGoalEvents()}>Tore aus Verlauf wiederherstellen</button></div> : <p>Noch kein Tor erfasst.</p>}</>}</aside></div>}</>;
 }
 
 function ProfileDialog({ profile, onClose, onSubmit }: { profile: Profile; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
