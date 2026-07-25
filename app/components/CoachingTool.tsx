@@ -154,7 +154,7 @@ function eventLineupId(event: CalendarEvent) {
   return `event-${event.id.replace(/[^a-zA-Z0-9._:-]/g, "_").slice(0, 210)}`;
 }
 
-export default function CoachingTool({ trainerName }: { trainerName: string }) {
+export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: { trainerName: string; trainerCanCorrectHistory: boolean }) {
   const [tab, setTab] = useState<Tab>("overview");
   const [overviewQuote, setOverviewQuote] = useState<(typeof trainerQuotes)[number]>(trainerQuotes[0]);
   const [overviewQuoteVersion, setOverviewQuoteVersion] = useState(0);
@@ -652,7 +652,7 @@ export default function CoachingTool({ trainerName }: { trainerName: string }) {
         </nav>
         <div className="coach-header-actions">
           <span className={pendingSaves ? "saving active" : "saving"} aria-live="polite">{pendingSaves ? "Speichert …" : "Gespeichert"}</span>
-          <span className="trainer-identity" title={`Angemeldet als ${trainerName}`}>Angemeldet: {trainerName}</span>
+          <span className="trainer-identity" title={`Angemeldet als ${trainerName}`}>Hallo, {trainerName}</span>
           <button className="logout-button" type="button" onClick={logout}>Abmelden</button>
         </div>
       </header>
@@ -687,7 +687,7 @@ export default function CoachingTool({ trainerName }: { trainerName: string }) {
               </div>
               <div className="section-heading"><div><p className="section-index">DIE NÄCHSTEN TERMINE</p><h2>Kalender</h2></div><button className="text-button" onClick={() => setTab("calendar")}>Alle anzeigen →</button></div>
               <div className="event-strip">{nextEvents.map((event) => <EventCard key={event.id} event={event} onOpen={openEvent} />)}</div>
-              {!migrationRequired && <HistoryPanel onRestored={refreshCoachingState} />}
+              {!migrationRequired && <HistoryPanel onRestored={refreshCoachingState} canCorrectLegacyJulia={trainerCanCorrectHistory} />}
             </section>
           )}
 
@@ -810,7 +810,7 @@ function historyActorName(value: string) {
   return firstName || "Trainer:in";
 }
 
-function HistoryPanel({ onRestored }: { onRestored: () => Promise<void> }) {
+function HistoryPanel({ onRestored, canCorrectLegacyJulia }: { onRestored: () => Promise<void>; canCorrectLegacyJulia: boolean }) {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -841,6 +841,25 @@ function HistoryPanel({ onRestored }: { onRestored: () => Promise<void> }) {
     }
   }
 
+  const legacyJuliaEntries = canCorrectLegacyJulia
+    ? entries.filter((entry) => entry.changed_by === "Frank" && ["tactic", "match_meta", "match_entry"].includes(entry.scope))
+    : [];
+
+  async function reassignLegacyJuliaEntries() {
+    if (!window.confirm("Die bisherigen Taktik- und Spielstatistik-Einträge vom 24.07. Julia zuordnen?")) return;
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/history", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "reassign_legacy_julia" }),
+      });
+      const data = await response.json() as { corrected?: number; error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Zuordnung fehlgeschlagen.");
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Zuordnung fehlgeschlagen.");
+    } finally { setBusy(false); }
+  }
+
   async function restore(entry: HistoryEntry) {
     if (!window.confirm("Diesen Eintrag auf den unmittelbar vorherigen Stand zurücksetzen?")) return;
     setBusy(true); setError("");
@@ -866,6 +885,7 @@ function HistoryPanel({ onRestored }: { onRestored: () => Promise<void> }) {
     {open && <div className="history-content" id="history-content">
       <div className="history-content-head"><h2>Letzte Änderungen</h2><a className="text-button" href="/api/backup" download>Backup herunterladen ↓</a></div>
       {error && <p className="coach-notice" role="status">{error}</p>}
+      {legacyJuliaEntries.length > 0 && <button className="history-correction" type="button" disabled={busy} onClick={() => void reassignLegacyJuliaEntries()}>Bisherige Taktik- und Spielstatistik Julia zuordnen</button>}
       {loading ? <p className="history-empty" role="status">Verlauf wird geladen …</p> : !entries.length && !error ? <p className="history-empty">Noch keine Änderungen im neuen Verlauf.</p> : <ol className="history-list">
         {entries.slice(0, 10).map((entry) => <li key={entry.id}><div><strong>{historyLabel(entry)}</strong><time dateTime={entry.changed_at}>{new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" }).format(new Date(entry.changed_at))} · {historyActorName(entry.changed_by ?? "")}</time></div><button type="button" disabled={busy} onClick={() => void restore(entry)}>Rückgängig</button></li>)}
       </ol>}
