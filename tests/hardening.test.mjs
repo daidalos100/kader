@@ -46,6 +46,9 @@ test("security and conflict controls stay present", async () => {
   assert.ok(auth.includes("TRAINER_SESSION_SECRET"));
   assert.ok(login.includes('autoComplete="username"'));
   assert.ok(login.includes('autoComplete="current-password"'));
+  assert.ok(login.includes("Trainerzugang wird geladen"));
+  assert.ok(!login.includes('id="trainer-pin"'));
+  assert.ok(!login.includes("Aufstellung öffnen"));
   assert.ok((await source("app/api/auth/route.ts")).includes("auth/v1/token?grant_type=password"));
   assert.ok((await source("app/api/auth/route.ts")).includes("createTrainerSession(trainer)"));
   assert.ok(!login.includes('method: "DELETE"'), "opening the login page must not terminate an active session");

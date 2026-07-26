@@ -51,6 +51,9 @@ button { color: inherit; touch-action: manipulation; -webkit-tap-highlight-color
 .logout-button:hover { border-color: var(--red); color: var(--white); }
 
 .login-shell { min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at 50% 20%, rgba(239,22,28,.14), transparent 28rem), var(--black); }
+.login-loading-shell { align-content: center; gap: 18px; text-align: center; }
+.login-loading-claim { width: min(620px, 82vw); height: auto; filter: drop-shadow(0 16px 38px rgba(239,22,28,.16)); }
+.login-loading-shell p { margin: 0; color: #9b9da3; font-size: .7rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
 .login-card { width: min(440px, 100%); padding: clamp(28px, 6vw, 52px); border: 1px solid rgba(244,243,239,.18); background: #101115; box-shadow: 0 32px 100px rgba(0,0,0,.55); text-align: center; }
 .login-card > img { width: 90px; height: 90px; margin-bottom: 25px; object-fit: contain; }
 .login-card h1 { margin: 10px 0 12px; font-size: clamp(2.4rem, 9vw, 4.5rem); line-height: .9; letter-spacing: -.06em; text-transform: uppercase; }
