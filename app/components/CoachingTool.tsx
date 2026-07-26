@@ -49,7 +49,8 @@ type DiagnosticDisciplineKey = "sprint10" | "sprint20" | "agility" | "dribbling"
 type SeasonStatKey = "appearances" | "training" | "goals" | "assists";
 type StatSortKey = "player" | "appearances" | "goals" | "assists" | "training";
 type StatEventDetail = { eventId: string; title: string; date: string; detail: string };
-type StatAward = { kind: "dream-duo" | "clean-sheet"; label: string; title: string };
+type StatAwardKind = "dream-duo" | "clean-sheet" | "comeback" | "upward-trend" | "chain" | "bollwerk" | "scorer-hero";
+type StatAward = { kind: StatAwardKind; label: string; title: string };
 type CalendarEventOverride = Pick<CalendarEvent, "id" | "uid" | "title" | "start" | "end" | "allDay" | "location" | "description" | "type">;
 type CoachingState = {
   roster: string[];
@@ -152,6 +153,32 @@ function eventLabel(type: CalendarEvent["type"]) {
 
 function eventLineupId(event: CalendarEvent) {
   return `event-${event.id.replace(/[^a-zA-Z0-9._:-]/g, "_").slice(0, 210)}`;
+}
+
+const defensivePositions = new Set(["TW", "LV", "IV", "RV"]);
+const recordedTrainingStatuses = new Set<AttendanceStatus>(["present", "excused", "absent"]);
+
+function playerFromLineupEntry(entry: { id?: string; firstName?: string }, profiles: Profile[]) {
+  return profiles.find((item) => item.id === entry.id)
+    ?? profiles.find((item) => item.firstName.localeCompare(entry.firstName?.trim() ?? "", "de", { sensitivity: "base" }) === 0);
+}
+
+function defensiveLineupPlayers(lineup: SavedLineup, profiles: Profile[]) {
+  const players = new Set<string>();
+  Object.entries(lineup).forEach(([position, lineupPlayers]) => {
+    if (!defensivePositions.has(position.toUpperCase())) return;
+    lineupPlayers.forEach((entry) => {
+      const player = playerFromLineupEntry(entry, profiles);
+      if (player) players.add(player.id);
+    });
+  });
+  return players;
+}
+
+function scoreFromResult(result: string) {
+  const match = result.trim().match(/^(\d+)\s*:\s*(\d+)$/);
+  if (!match) return null;
+  return { scored: Number(match[1]), conceded: Number(match[2]) };
 }
 
 function overviewReferenceTime(now = new Date()) {
@@ -568,6 +595,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
     const awards: Record<string, StatAward[]> = {};
     const pairStats = new Map<string, { playerA: string; playerB: string; count: number; eventIds: Set<string> }>();
     const rosterIds = new Set(profiles.map((player) => player.id));
+    const addAward = (playerId: string, award: StatAward) => { (awards[playerId] ??= []).push(award); };
 
     Object.entries(state.matches).forEach(([eventId, match]) => {
       (match.goalEvents ?? []).forEach((goal) => {
@@ -590,42 +618,142 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
       const playerB = profiles.find((player) => player.id === dreamDuo.playerB);
       if (playerA && playerB) {
         const gameLabel = dreamDuo.eventIds.size === 1 ? "Spiel" : "Spielen";
-        (awards[playerA.id] ??= []).push({
+        addAward(playerA.id, {
           kind: "dream-duo",
-          label: `💫 Traumduo: ${playerB.firstName}`,
+          label: `🤝 mit ${playerB.firstName}`,
           title: `${dreamDuo.count} gemeinsame Toraktionen in ${dreamDuo.eventIds.size} ${gameLabel}`,
         });
-        (awards[playerB.id] ??= []).push({
+        addAward(playerB.id, {
           kind: "dream-duo",
-          label: `💫 Traumduo: ${playerA.firstName}`,
+          label: `🤝 mit ${playerA.firstName}`,
           title: `${dreamDuo.count} gemeinsame Toraktionen in ${dreamDuo.eventIds.size} ${gameLabel}`,
         });
       }
     }
 
     const cleanSheets: Record<string, number> = {};
-    gameEvents.forEach((event) => {
+    const defensiveMatchRows: Array<{ event: CalendarEvent; defenders: Set<string>; conceded: number }> = [];
+    const completedGameEvents = gameEvents.filter((event) => new Date(event.start).getTime() <= Date.now());
+    completedGameEvents.forEach((event) => {
       const match = state.matches[event.id];
-      if (!match || !/^\s*\d+\s*:\s*0\s*$/.test(match.result)) return;
       const lineup = eventLineups[eventLineupId(event)] ?? {};
-      const defensivePlayers = new Set<string>();
-      Object.entries(lineup).forEach(([position, lineupPlayers]) => {
-        if (!["TW", "LV", "IV", "RV"].includes(position.toUpperCase())) return;
-        lineupPlayers.forEach((entry) => {
-          const player = profiles.find((item) => item.id === entry.id)
-            ?? profiles.find((item) => item.firstName.localeCompare(entry.firstName?.trim() ?? "", "de", { sensitivity: "base" }) === 0);
-          if (player) defensivePlayers.add(player.id);
-        });
-      });
-      defensivePlayers.forEach((id) => { cleanSheets[id] = (cleanSheets[id] ?? 0) + 1; });
+      const defenders = defensiveLineupPlayers(lineup, profiles);
+      const score = match ? scoreFromResult(match.result) : null;
+      if (!score || !defenders.size) return;
+      defensiveMatchRows.push({ event, defenders, conceded: score.conceded });
+      if (score.conceded === 0) defenders.forEach((id) => { cleanSheets[id] = (cleanSheets[id] ?? 0) + 1; });
     });
     Object.entries(cleanSheets).forEach(([id, count]) => {
-      (awards[id] ??= []).push({
+      addAward(id, {
         kind: "clean-sheet",
         label: count === 1 ? "🛡️ Weiße Weste" : `🛡️ ${count}`,
         title: `Bei ${count} ${count === 1 ? "Zu-null-Spiel" : "Zu-null-Spielen"} in der Defensive aufgestellt`,
       });
     });
+
+    // Comeback: In den fünf erfassten Trainings vor einer fünf Termine langen Anwesenheitsserie
+    // müssen mindestens drei Abwesenheiten liegen. Nicht erfasste Termine werden nicht interpretiert.
+    const completedTrainingEvents = calendarEvents
+      .filter((event) => event.type === "training" && new Date(event.start).getTime() <= Date.now())
+      .sort((left, right) => left.start.localeCompare(right.start));
+    profiles.forEach((player) => {
+      const attendanceSeries = completedTrainingEvents
+        .map((event) => state.attendance[event.id]?.[player.id])
+        .filter((status): status is AttendanceStatus => Boolean(status) && recordedTrainingStatuses.has(status));
+      for (let index = 5; index + 5 <= attendanceSeries.length; index += 1) {
+        const before = attendanceSeries.slice(index - 5, index);
+        const after = attendanceSeries.slice(index, index + 5);
+        if (before.filter((status) => status !== "present").length >= 3 && after.every((status) => status === "present")) {
+          addAward(player.id, {
+            kind: "comeback",
+            label: "🌱 Comeback",
+            title: "Nach mindestens drei Abwesenheiten in fünf Terminen fünf Trainings in Folge anwesend",
+          });
+          break;
+        }
+      }
+    });
+
+    // Aufwärtstrend: Vergleich des laufenden Kalendermonats mit dem Vormonat, nur bei belastbarer Datenbasis.
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+    const trainingRateForPeriod = (playerId: string, from: number, until: number) => {
+      let present = 0;
+      let recorded = 0;
+      completedTrainingEvents.forEach((event) => {
+        const time = new Date(event.start).getTime();
+        if (time < from || time >= until) return;
+        const status = state.attendance[event.id]?.[playerId];
+        if (!status || !recordedTrainingStatuses.has(status)) return;
+        recorded += 1;
+        if (status === "present") present += 1;
+      });
+      return { recorded, rate: recorded ? (present / recorded) * 100 : null };
+    };
+    profiles.forEach((player) => {
+      const current = trainingRateForPeriod(player.id, currentMonthStart, now.getTime() + 1);
+      const previous = trainingRateForPeriod(player.id, previousMonthStart, currentMonthStart);
+      if (current.recorded >= 3 && previous.recorded >= 3 && current.rate !== null && previous.rate !== null && current.rate - previous.rate >= 10) {
+        addAward(player.id, {
+          kind: "upward-trend",
+          label: "📈 Aufwärtstrend",
+          title: `Trainingsquote um ${Math.round(current.rate - previous.rate)} Prozentpunkte gegenüber dem Vormonat verbessert`,
+        });
+      }
+    });
+
+    // Kette: Zwei direkt aufeinanderfolgende, eindeutig gespeicherte Zu-null-Spiele in einer Defensivposition.
+    const defensiveStreaks: Record<string, number> = {};
+    completedGameEvents.forEach((event) => {
+      const match = state.matches[event.id];
+      const score = match ? scoreFromResult(match.result) : null;
+      const defenders = score ? defensiveLineupPlayers(eventLineups[eventLineupId(event)] ?? {}, profiles) : new Set<string>();
+      profiles.forEach((player) => {
+        const hasCleanSheet = score?.conceded === 0 && defenders.has(player.id);
+        defensiveStreaks[player.id] = hasCleanSheet ? (defensiveStreaks[player.id] ?? 0) + 1 : 0;
+        if (defensiveStreaks[player.id] === 2) {
+          addAward(player.id, {
+            kind: "chain",
+            label: "⛓️ Kette",
+            title: "Mindestens zwei Zu-null-Spiele in Folge in der Defensive aufgestellt",
+          });
+        }
+      });
+    });
+
+    // Bollwerk: geringste Zahl an Gegentoren je auswertbarem Defensiv-Einsatz.
+    const defensiveTotals: Record<string, { appearances: number; conceded: number }> = {};
+    defensiveMatchRows.forEach(({ defenders, conceded }) => {
+      defenders.forEach((id) => {
+        const total = defensiveTotals[id] ?? { appearances: 0, conceded: 0 };
+        total.appearances += 1;
+        total.conceded += conceded;
+        defensiveTotals[id] = total;
+      });
+    });
+    const bollwerkCandidates = Object.entries(defensiveTotals).map(([id, total]) => ({ id, total, rate: total.conceded / total.appearances }));
+    if (bollwerkCandidates.length) {
+      const bestRate = Math.min(...bollwerkCandidates.map((item) => item.rate));
+      bollwerkCandidates.filter((item) => Math.abs(item.rate - bestRate) < 0.00001).forEach(({ id, total, rate }) => {
+        addAward(id, {
+          kind: "bollwerk",
+          label: "🧱 Bollwerk",
+          title: `${rate.toLocaleString("de-DE", { maximumFractionDigits: 2 })} Gegentore pro Defensiv-Einsatz bei ${total.appearances} ${total.appearances === 1 ? "Einsatz" : "Einsätzen"}`,
+        });
+      });
+    }
+
+    const topScorerValue = Math.max(0, ...statsRows.map((row) => row.goals + row.assists));
+    if (topScorerValue > 0) {
+      statsRows.filter((row) => row.goals + row.assists === topScorerValue).forEach((row) => {
+        addAward(row.player.id, {
+          kind: "scorer-hero",
+          label: "⭐ Scorer-Held",
+          title: `${row.goals + row.assists} Scorerpunkte (${row.goals} ${row.goals === 1 ? "Tor" : "Tore"}, ${row.assists} ${row.assists === 1 ? "Assist" : "Assists"})`,
+        });
+      });
+    }
     return awards;
   })();
   const overviewTraining = useMemo(() => {
@@ -674,7 +802,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
     const dreamOwner = profiles.find((player) => (awardsByPlayer[player.id] ?? []).some((award) => award.kind === "dream-duo"));
     const dream = dreamOwner ? (awardsByPlayer[dreamOwner.id] ?? []).find((award) => award.kind === "dream-duo") : undefined;
     const clean = profiles.flatMap((player) => awardsByPlayer[player.id] ?? []).find((award) => award.kind === "clean-sheet");
-    const dreamPartner = dream?.label.replace("💫 Traumduo: ", "");
+    const dreamPartner = dream?.label.replace("🤝 mit ", "");
     return {
       goals: top("goals"),
       assists: top("assists"),
@@ -889,6 +1017,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
             <section className="coach-view">
               <div className="view-heading compact"><div><p className="section-index">SPIELE &amp; ENTWICKLUNG</p><h1>Statistik.</h1><p>Spielwerte werden pro Kalendertermin erfasst und automatisch summiert.</p></div></div>
               <div className="stats-table-wrap"><StatsTable rows={statsRows} totalMatches={totalMatches} awardsByPlayer={awardsByPlayer} /></div>
+              <StatsAwardLegend />
             </section>
           )}
         </>
@@ -1147,8 +1276,25 @@ function StatsTable({ rows, totalMatches, awardsByPlayer }: { rows: Array<{ play
     const trainingStatus = rateStatus(row.participation);
     const appearanceStatus = rateStatus(appearanceRate);
     const awards = awardsByPlayer[row.player.id] ?? [];
-    return <tr key={row.player.id}><td><Image src={`/api/player-image?name=${encodeURIComponent(row.player.firstName)}`} alt="" width={36} height={36} unoptimized /><strong>{row.player.firstName}</strong></td><td><button type="button" className={`stat-value stats-value-button stat-${trainingStatus}`} onClick={() => setDetail({ player: row.player, label: "Training", value: row.participation === null ? "—" : `${row.participation}%`, events: row.trainingEvents })} title={row.participation === null ? "Noch keine Trainings erfasst" : `${row.participation}% Trainingsteilnahme`}><i aria-hidden="true" />{row.participation === null ? "—" : `${row.participation}%`}{bestTrainingRate > 0 && row.participation === bestTrainingRate && <span className="stat-crown" title="Höchste Trainingsteilnahme" aria-label="Höchste Trainingsteilnahme">👑</span>}</button></td><td><button type="button" className={`stat-value stats-value-button stat-${appearanceStatus}`} onClick={() => setDetail({ player: row.player, label: "Einsätze", value: appearanceRate === null ? "—" : `${appearanceRate}%`, events: row.appearanceEvents })} title={appearanceRate === null ? "Noch keine Spieltage erfasst" : `${appearanceRate}% Einsatzquote`}><i aria-hidden="true" />{appearanceRate === null ? "—" : `${appearanceRate}%`}{bestAppearanceRate > 0 && appearanceRate === bestAppearanceRate && <span className="stat-crown" title="Höchste Einsatzquote" aria-label="Höchste Einsatzquote">👑</span>}</button></td><td><button type="button" className="stat-value stats-value-button" onClick={() => setDetail({ player: row.player, label: "Tore", value: String(row.goals), events: row.goalEvents })}>{row.goals}{bestGoals > 0 && row.goals === bestGoals && <span className="stat-crown" title="Beste Torschützin / bester Torschütze" aria-label="Beste Torschützin / bester Torschütze">👑</span>}</button></td><td><button type="button" className="stat-value stats-value-button" onClick={() => setDetail({ player: row.player, label: "Assists", value: String(row.assists), events: row.assistEvents })}>{row.assists}{bestAssists > 0 && row.assists === bestAssists && <span className="stat-crown" title="Beste Assistgeberin / bester Assistgeber" aria-label="Beste Assistgeberin / bester Assistgeber">👑</span>}</button></td><td className="stats-award-cell">{awards.map((award) => <span key={award.kind} className={`stats-award stats-award-${award.kind}`} title={award.title} aria-label={`${award.label}. ${award.title}`}>{award.label}</span>)}</td></tr>;
+    return <tr key={row.player.id}><td><Image src={`/api/player-image?name=${encodeURIComponent(row.player.firstName)}`} alt="" width={36} height={36} unoptimized /><strong>{row.player.firstName}</strong></td><td><button type="button" className={`stat-value stats-value-button stat-${trainingStatus}`} onClick={() => setDetail({ player: row.player, label: "Training", value: row.participation === null ? "—" : `${row.participation}%`, events: row.trainingEvents })} title={row.participation === null ? "Noch keine Trainings erfasst" : `${row.participation}% Trainingsteilnahme`}><i aria-hidden="true" />{row.participation === null ? "—" : `${row.participation}%`}{bestTrainingRate > 0 && row.participation === bestTrainingRate && <span className="stat-crown" title="Höchste Trainingsteilnahme" aria-label="Höchste Trainingsteilnahme">👑</span>}</button></td><td><button type="button" className={`stat-value stats-value-button stat-${appearanceStatus}`} onClick={() => setDetail({ player: row.player, label: "Einsätze", value: appearanceRate === null ? "—" : `${appearanceRate}%`, events: row.appearanceEvents })} title={appearanceRate === null ? "Noch keine Spieltage erfasst" : `${appearanceRate}% Einsatzquote`}><i aria-hidden="true" />{appearanceRate === null ? "—" : `${appearanceRate}%`}{bestAppearanceRate > 0 && appearanceRate === bestAppearanceRate && <span className="stat-crown" title="Höchste Einsatzquote" aria-label="Höchste Einsatzquote">👑</span>}</button></td><td><button type="button" className="stat-value stats-value-button" onClick={() => setDetail({ player: row.player, label: "Tore", value: String(row.goals), events: row.goalEvents })}>{row.goals}{bestGoals > 0 && row.goals === bestGoals && <span className="stat-crown stat-leader-goals" title="Beste Torschützin / bester Torschütze" aria-label="Beste Torschützin / bester Torschütze">⚽</span>}</button></td><td><button type="button" className="stat-value stats-value-button" onClick={() => setDetail({ player: row.player, label: "Assists", value: String(row.assists), events: row.assistEvents })}>{row.assists}{bestAssists > 0 && row.assists === bestAssists && <span className="stat-crown stat-leader-assists" title="Beste Assistgeberin / bester Assistgeber">🎯</span>}</button></td><td className="stats-award-cell">{awards.map((award) => <span key={award.kind} className={`stats-award stats-award-${award.kind}`} title={award.title} aria-label={`${award.label}. ${award.title}`}>{award.label}</span>)}</td></tr>;
   })}</tbody></table>{detail && <StatDetailsDialog {...detail} onClose={() => setDetail(null)} />}</>;
+}
+
+function StatsAwardLegend() {
+  const entries = [
+    ["👑", "Trainingskrone", "Höchste positive Trainingsquote."],
+    ["👑", "Einsatzkrone", "Höchste positive Einsatzquote."],
+    ["⚽", "Torjäger:in", "Die meisten Tore."],
+    ["🎯", "Assistkönig:in", "Die meisten Assists."],
+    ["🤝", "Traumduo", "Mindestens zwei gemeinsame Toraktionen mit einem Partner."],
+    ["🛡️", "Weiße Weste", "Bei einem oder mehr Zu-null-Spielen in der Defensive aufgestellt."],
+    ["🌱", "Comeback", "Nach drei Abwesenheiten in fünf Terminen fünf Trainings in Folge anwesend."],
+    ["📈", "Aufwärtstrend", "Trainingsquote im aktuellen Monat um mindestens 10 Prozentpunkte verbessert."],
+    ["⛓️", "Kette", "Mindestens zwei Zu-null-Spiele in Folge in der Defensive aufgestellt."],
+    ["🧱", "Bollwerk", "Wenigste Gegentore pro auswertbarem Defensiv-Einsatz."],
+    ["⭐", "Scorer-Held", "Meiste Tore und Assists zusammen."],
+  ] as const;
+  return <section className="stats-award-legend" aria-labelledby="stats-award-legend-title"><p className="section-index">AUSZEICHNUNGEN</p><h2 id="stats-award-legend-title">Badge-Legende.</h2><div>{entries.map(([emoji, title, description]) => <article key={title}><span aria-hidden="true">{emoji}</span><p><strong>{title}</strong><small>{description}</small></p></article>)}</div></section>;
 }
 
 function StatDetailsDialog({ player, label, value, events, onClose }: { player: Profile; label: string; value: string; events: StatEventDetail[]; onClose: () => void }) {

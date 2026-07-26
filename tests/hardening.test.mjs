@@ -166,6 +166,18 @@ test("statistics show percentage appearances and event-level details", async () 
   }
 });
 
+test("statistics awards stay derived from saved training, lineup and match data", async () => {
+  const [component, css] = await Promise.all([
+    source("app/components/CoachingTool.tsx"), source("app/globals.css"),
+  ]);
+  for (const marker of ["scoreFromResult", "defensiveLineupPlayers", "recordedTrainingStatuses", "🌱 Comeback", "📈 Aufwärtstrend", "⛓️ Kette", "🧱 Bollwerk", "⭐ Scorer-Held", "🤝 mit", "StatsAwardLegend", "⚽", "🎯"]) {
+    assert.ok(component.includes(marker), `missing ${marker}`);
+  }
+  for (const marker of ["stats-award-comeback", "stats-award-upward-trend", "stats-award-chain", "stats-award-bollwerk", "stats-award-scorer-hero", "stats-award-legend"]) {
+    assert.ok(css.includes(marker), `missing ${marker}`);
+  }
+});
+
 test("player card back keeps details accessible on constrained screens", async () => {
   const [css, component] = await Promise.all([
     source("app/globals.css"), source("app/components/CoachingTool.tsx"),

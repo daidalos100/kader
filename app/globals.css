@@ -628,6 +628,19 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
 .stats-award + .stats-award { margin-top: 5px; }
 .stats-award-dream-duo { border-color: rgba(135,184,255,.38); background: rgba(83,137,220,.11); }
 .stats-award-clean-sheet { border-color: rgba(100,201,168,.4); background: rgba(58,148,120,.11); }
+.stats-award-comeback { border-color: rgba(126,219,134,.42); background: rgba(85,185,93,.11); }
+.stats-award-upward-trend { border-color: rgba(115,194,255,.42); background: rgba(73,144,219,.11); }
+.stats-award-chain { border-color: rgba(202,187,153,.42); background: rgba(156,133,87,.11); }
+.stats-award-bollwerk { border-color: rgba(166,184,215,.42); background: rgba(103,124,166,.11); }
+.stats-award-scorer-hero { border-color: rgba(255,212,108,.45); background: rgba(203,153,36,.11); }
+.stats-award-legend { margin-top: clamp(38px, 6vw, 72px); padding-top: 18px; border-top: 1px solid rgba(244,243,239,.15); }
+.stats-award-legend h2 { margin: 7px 0 22px; font-size: clamp(1.5rem, 3vw, 2.2rem); text-transform: uppercase; }
+.stats-award-legend > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; border: 1px solid rgba(244,243,239,.14); background: rgba(244,243,239,.14); }
+.stats-award-legend article { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; min-height: 82px; padding: 15px; background: #101115; }
+.stats-award-legend article > span { font-size: 1.1rem; line-height: 1.25; }
+.stats-award-legend article p { display: grid; gap: 4px; margin: 0; }
+.stats-award-legend article strong { color: var(--white); font-size: .73rem; letter-spacing: .03em; }
+.stats-award-legend article small { color: #9a9ba0; font-size: .62rem; line-height: 1.42; }
 .stats-sort-button { display: inline-flex; align-items: center; gap: 6px; padding: 4px 0; border: 0; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
 .stats-sort-button span { color: #676971; font-size: .8rem; line-height: 1; }
 .stats-sort-button:hover, .stats-sort-button:focus-visible, .stats-sort-button.active { color: var(--white); outline: none; }
@@ -644,6 +657,7 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
 .stat-value.stat-critical i { background: #e34a50; box-shadow: 0 0 0 5px rgba(227,74,80,.15); }
 .stat-value.stat-neutral { color: #a8aab0; }
 .stat-crown { display: inline-flex; align-items: center; margin-left: 2px; font-size: .82rem; line-height: 1; }
+.stat-leader-goals, .stat-leader-assists { margin-left: 3px; font-size: .8rem; }
 .match-editor { position: sticky; top: 110px; padding: 24px; border: 1px solid rgba(244,243,239,.15); background: #101115; }
 .match-editor > label, .match-panel > label, .coach-modal label { display: grid; gap: 7px; color: #c4c5c9; font-size: .62rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .match-editor select, .match-panel input, .coach-modal input, .coach-modal select, .coach-modal textarea { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid rgba(244,243,239,.38); border-radius: 0; outline: 0; background: #090a0d; color: var(--white); }
@@ -815,6 +829,7 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
   .setup-banner { align-items: flex-start; flex-direction: column; }
   .tactics-pitch { min-height: 740px; }
   .tactics-workspace.presenting .tactics-pitch { height: calc(100dvh - 132px); min-height: 680px; }
+  .stats-award-legend > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 560px) {
@@ -854,6 +869,8 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
   .form-grid .wide { grid-column: auto; }
   .diagnostic-form > span { display: none; }
   .stats-table { min-width: 560px; }
+  .stats-award-legend > div { grid-template-columns: 1fr; }
+  .stats-award-legend article { min-height: 0; padding: 13px; }
   .match-editor { padding: 17px 12px; }
   .matchday-heading { align-items: flex-start; flex-direction: column; }
   .matchday-view { padding-top: 14px; }
