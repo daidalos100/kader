@@ -173,6 +173,7 @@ test("statistics awards stay derived from saved training, lineup and match data"
   for (const marker of ["scoreFromResult", "defensiveLineupPlayers", "recordedTrainingStatuses", "🌱 Comeback", "📈 Aufwärtstrend", "⛓️ Kette", "🧱 Bollwerk", "⭐ Scorer-Held", "✨ mit", "dreamDuos", "StatsAwardLegend", "⚽", "🎯", "🔥"]) {
     assert.ok(component.includes(marker), `missing ${marker}`);
   }
+  assert.ok(component.includes("const orderedAwards"));
   for (const marker of ["stats-award-comeback", "stats-award-upward-trend", "stats-award-chain", "stats-award-bollwerk", "stats-award-scorer-hero", "stats-award-legend"]) {
     assert.ok(css.includes(marker), `missing ${marker}`);
   }

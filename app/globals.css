@@ -413,9 +413,8 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .metric-best-list span, .metric-king-list span { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 7px; margin: 0; color: #d5d5d7; font-size: .7rem; font-weight: 700; letter-spacing: .015em; text-transform: none; }
 .metric-best-list b, .metric-king-list b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .metric-best-list strong, .metric-king-list strong { color: var(--white); font-size: .75rem; line-height: 1.15; letter-spacing: 0; white-space: nowrap; }
-.metric-best-list span { grid-template-columns: auto auto minmax(0, 1fr); font-size: .69rem; }
+.metric-best-list span { grid-template-columns: auto minmax(0, 1fr); font-size: .69rem; }
 .metric-best-list span > b { font-size: .82rem; line-height: 1; }
-.metric-best-list span > em { color: #b7b9bf; font-style: normal; white-space: nowrap; }
 .metric-best-list strong { overflow: hidden; color: var(--white); text-overflow: ellipsis; font-size: .76rem; }
 .metric-best-empty { display: block; color: #8f9197; font-size: .72rem; }
 .metric-king-list { gap: 4px; margin-top: 12px; }
