@@ -619,13 +619,13 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
       const gameLabel = dreamDuo.eventIds.size === 1 ? "Spiel" : "Spielen";
       addAward(playerA.id, {
         kind: "dream-duo",
-        label: `🤝 mit ${playerB.firstName}`,
-        title: `${dreamDuo.count} gemeinsame Toraktionen in ${dreamDuo.eventIds.size} ${gameLabel}`,
+        label: `✨ mit ${playerB.firstName}`,
+        title: `Bestwert: ${dreamDuo.count} gemeinsame Toraktionen in ${dreamDuo.eventIds.size} ${gameLabel}`,
       });
       addAward(playerB.id, {
         kind: "dream-duo",
-        label: `🤝 mit ${playerA.firstName}`,
-        title: `${dreamDuo.count} gemeinsame Toraktionen in ${dreamDuo.eventIds.size} ${gameLabel}`,
+        label: `✨ mit ${playerA.firstName}`,
+        title: `Bestwert: ${dreamDuo.count} gemeinsame Toraktionen in ${dreamDuo.eventIds.size} ${gameLabel}`,
       });
     });
 
@@ -802,7 +802,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
     const namesForAward = (kind: StatAwardKind) => profiles.filter((player) => (awardsByPlayer[player.id] ?? []).some((award) => award.kind === kind)).map((player) => player.firstName);
     const dreamPairs = new Set<string>();
     profiles.forEach((player) => (awardsByPlayer[player.id] ?? []).filter((award) => award.kind === "dream-duo").forEach((award) => {
-      const partner = award.label.replace("🤝 mit ", "");
+      const partner = award.label.replace("✨ mit ", "");
       dreamPairs.add([player.firstName, partner].sort((left, right) => left.localeCompare(right, "de")).join(" & "));
     }));
     const entries = [
@@ -810,7 +810,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
       { icon: "🔥", title: "Einsätze", names: appearanceBest > 0 ? statsRows.filter((row) => totalMatches && Math.round((row.appearances / totalMatches) * 100) === appearanceBest).map((row) => row.player.firstName) : [] },
       { icon: "⚽", title: "Tore", names: namesForStat("goals") },
       { icon: "🎯", title: "Assists", names: namesForStat("assists") },
-      { icon: "🤝", title: "Traumduo", names: [...dreamPairs] },
+      { icon: "✨", title: "Traumduo", names: [...dreamPairs] },
       { icon: "🛡️", title: "Weiße Weste", names: namesForAward("clean-sheet") },
       { icon: "🌱", title: "Comeback", names: namesForAward("comeback") },
       { icon: "📈", title: "Aufwärtstrend", names: namesForAward("upward-trend") },
@@ -1293,7 +1293,7 @@ function StatsTable({ rows, totalMatches, awardsByPlayer }: { rows: Array<{ play
       ...(bestGoals > 0 && row.goals === bestGoals ? [{ kind: "goals-leader" as StatAwardKind, label: "⚽", title: "Die meisten Tore" }] : []),
       ...(bestAssists > 0 && row.assists === bestAssists ? [{ kind: "assists-leader" as StatAwardKind, label: "🎯", title: "Die meisten Assists" }] : []),
     ];
-    return <tr key={row.player.id}><td><Image src={`/api/player-image?name=${encodeURIComponent(row.player.firstName)}`} alt="" width={36} height={36} unoptimized /><strong>{row.player.firstName}</strong></td><td><button type="button" className={`stat-value stats-value-button stat-${trainingStatus}`} onClick={() => setDetail({ player: row.player, label: "Training", value: row.participation === null ? "—" : `${row.participation}%`, events: row.trainingEvents })} title={row.participation === null ? "Noch keine Trainings erfasst" : `${row.participation}% Trainingsteilnahme`}><i aria-hidden="true" />{row.participation === null ? "—" : `${row.participation}%`}</button></td><td><button type="button" className={`stat-value stats-value-button stat-${appearanceStatus}`} onClick={() => setDetail({ player: row.player, label: "Einsätze", value: appearanceRate === null ? "—" : `${appearanceRate}%`, events: row.appearanceEvents })} title={appearanceRate === null ? "Noch keine Spieltage erfasst" : `${appearanceRate}% Einsatzquote`}><i aria-hidden="true" />{appearanceRate === null ? "—" : `${appearanceRate}%`}</button></td><td><button type="button" className="stat-value stats-value-button" onClick={() => setDetail({ player: row.player, label: "Tore", value: String(row.goals), events: row.goalEvents })}>{row.goals}</button></td><td><button type="button" className="stat-value stats-value-button" onClick={() => setDetail({ player: row.player, label: "Assists", value: String(row.assists), events: row.assistEvents })}>{row.assists}</button></td><td className="stats-award-cell">{[...leaderAwards, ...awards].map((award) => <span key={`${award.kind}-${award.label}`} className={`stats-award stats-award-${award.kind}`} title={award.title} aria-label={`${award.label}. ${award.title}`}>{award.label.match(/^\p{Extended_Pictographic}/u)?.[0] ?? award.label}</span>)}</td></tr>;
+    return <tr key={row.player.id}><td><Image src={`/api/player-image?name=${encodeURIComponent(row.player.firstName)}`} alt="" width={36} height={36} unoptimized /><strong>{row.player.firstName}</strong></td><td><button type="button" className={`stat-value stats-value-button stat-${trainingStatus}`} onClick={() => setDetail({ player: row.player, label: "Training", value: row.participation === null ? "—" : `${row.participation}%`, events: row.trainingEvents })} title={row.participation === null ? "Noch keine Trainings erfasst" : `${row.participation}% Trainingsteilnahme`}><i aria-hidden="true" />{row.participation === null ? "—" : `${row.participation}%`}</button></td><td><button type="button" className={`stat-value stats-value-button stat-${appearanceStatus}`} onClick={() => setDetail({ player: row.player, label: "Einsätze", value: appearanceRate === null ? "—" : `${appearanceRate}%`, events: row.appearanceEvents })} title={appearanceRate === null ? "Noch keine Spieltage erfasst" : `${appearanceRate}% Einsatzquote`}><i aria-hidden="true" />{appearanceRate === null ? "—" : `${appearanceRate}%`}</button></td><td><button type="button" className="stat-value stats-value-button" onClick={() => setDetail({ player: row.player, label: "Tore", value: String(row.goals), events: row.goalEvents })}>{row.goals}</button></td><td><button type="button" className="stat-value stats-value-button" onClick={() => setDetail({ player: row.player, label: "Assists", value: String(row.assists), events: row.assistEvents })}>{row.assists}</button></td><td className="stats-award-cell">{[...leaderAwards, ...awards].map((award) => <span key={`${award.kind}-${award.label}`} className={`stats-award stats-award-${award.kind}`} title={award.title} aria-label={`${award.label}. ${award.title}`}>{award.kind === "dream-duo" ? award.label : award.label.match(/^\p{Extended_Pictographic}/u)?.[0] ?? award.label}</span>)}</td></tr>;
   })}</tbody></table>{detail && <StatDetailsDialog {...detail} onClose={() => setDetail(null)} />}</>;
 }
 
@@ -1303,7 +1303,7 @@ function StatsAwardLegend() {
     ["🔥", "Einsatz-Bestwert", "Höchste positive Einsatzquote."],
     ["⚽", "Torjäger:in", "Die meisten Tore."],
     ["🎯", "Assistkönig:in", "Die meisten Assists."],
-    ["🤝", "Traumduo", "Mindestens zwei gemeinsame Toraktionen mit einem Partner."],
+    ["✨", "Traumduo", "Bestwert für gemeinsame Toraktionen eines Paars: Tore nach Assist und Assists vor Toren werden zusammengezählt."],
     ["🛡️", "Weiße Weste", "Bei einem oder mehr Zu-null-Spielen in der Defensive aufgestellt."],
     ["🌱", "Comeback", "Nach drei Abwesenheiten in fünf Terminen fünf Trainings in Folge anwesend."],
     ["📈", "Aufwärtstrend", "Trainingsquote im aktuellen Monat um mindestens 10 Prozentpunkte verbessert."],

@@ -626,9 +626,9 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
 .stats-table td { padding: 13px 15px; border-top: 1px solid rgba(244,243,239,.09); color: #c7c7c8; }
 .stats-table td:first-child { display: flex; align-items: center; gap: 10px; color: var(--white); }
 .stats-award-heading { min-width: 164px; }
-.stats-award-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; min-width: 132px; }
-.stats-award { display: inline-grid; width: 34px; height: 34px; place-items: center; border: 1px solid rgba(244,243,239,.15); background: rgba(244,243,239,.045); color: #e8e8ea; font-size: 1.08rem; line-height: 1; }
-.stats-award-dream-duo { border-color: rgba(135,184,255,.38); background: rgba(83,137,220,.11); }
+.stats-award-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 132px; }
+.stats-award { display: inline-flex; align-items: center; justify-content: center; min-width: 25px; color: #e8e8ea; font-size: 1.2rem; line-height: 1; }
+.stats-award-dream-duo { gap: 4px; min-width: 0; color: var(--white); font-size: .76rem; font-weight: 800; white-space: nowrap; }
 .stats-award-clean-sheet { border-color: rgba(100,201,168,.4); background: rgba(58,148,120,.11); }
 .stats-award-comeback { border-color: rgba(126,219,134,.42); background: rgba(85,185,93,.11); }
 .stats-award-upward-trend { border-color: rgba(115,194,255,.42); background: rgba(73,144,219,.11); }

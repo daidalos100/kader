@@ -170,7 +170,7 @@ test("statistics awards stay derived from saved training, lineup and match data"
   const [component, css] = await Promise.all([
     source("app/components/CoachingTool.tsx"), source("app/globals.css"),
   ]);
-  for (const marker of ["scoreFromResult", "defensiveLineupPlayers", "recordedTrainingStatuses", "🌱 Comeback", "📈 Aufwärtstrend", "⛓️ Kette", "🧱 Bollwerk", "⭐ Scorer-Held", "🤝 mit", "dreamDuos", "StatsAwardLegend", "⚽", "🎯", "🔥"]) {
+  for (const marker of ["scoreFromResult", "defensiveLineupPlayers", "recordedTrainingStatuses", "🌱 Comeback", "📈 Aufwärtstrend", "⛓️ Kette", "🧱 Bollwerk", "⭐ Scorer-Held", "✨ mit", "dreamDuos", "StatsAwardLegend", "⚽", "🎯", "🔥"]) {
     assert.ok(component.includes(marker), `missing ${marker}`);
   }
   for (const marker of ["stats-award-comeback", "stats-award-upward-trend", "stats-award-chain", "stats-award-bollwerk", "stats-award-scorer-hero", "stats-award-legend"]) {
