@@ -26,6 +26,7 @@ test("mobile and accessibility safeguards stay present", async () => {
   assert.ok(component.includes("const onKeyDown = (event: KeyboardEvent)"));
   assert.ok(css.includes(".attendance-options { display: flex; flex-wrap: wrap; gap: 5px; }"));
   assert.ok(css.includes(".static-card, .static-card .fc-card-inner { height: auto; min-height: 0; }"));
+  assert.ok(css.includes(".static-card .static-face { position: relative;"));
   assert.ok(component.includes('const hasTrafficLight = keyName === "appearances" || keyName === "training"'));
 });
 
