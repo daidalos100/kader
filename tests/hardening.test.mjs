@@ -39,11 +39,14 @@ test("security and conflict controls stay present", async () => {
   }
   assert.ok(auth.includes("HMAC"));
   assert.ok(auth.includes("sessionMaxAgeSeconds"));
+  assert.ok(auth.includes("60 * 60 * 24 * 14"));
   assert.ok(auth.includes("TRAINER_ACCESS_JSON"));
   assert.ok(auth.includes("TRAINER_SESSION_SECRET"));
   assert.ok(login.includes('autoComplete="username"'));
   assert.ok(login.includes('autoComplete="current-password"'));
   assert.ok((await source("app/api/auth/route.ts")).includes("auth/v1/token?grant_type=password"));
+  assert.ok((await source("app/api/auth/route.ts")).includes("createTrainerSession(trainer)"));
+  assert.ok(!login.includes('method: "DELETE"'), "opening the login page must not terminate an active session");
   assert.ok(stateRoute.includes("expectedRevision"));
   assert.ok(stateRoute.includes("status: 409"));
   for (const control of ["enable row level security", "apply_coaching_record", "consume_login_attempt", "coaching_history", "coaching_backups"]) {
@@ -53,6 +56,13 @@ test("security and conflict controls stay present", async () => {
   assert.ok(!migration.includes("errcode = '40001'"), "serialization errors must not be used for user conflicts");
   assert.ok(tacticsMigration.includes("'tactic'"));
   assert.ok(tacticsMigration.includes("coaching_records_scope_check"));
+});
+
+test("active trainer sessions renew without weakening the cookie protections", async () => {
+  const component = await source("app/components/CoachingTool.tsx");
+  for (const marker of ["keepSessionAlive", "visibilitychange", "30 * 60 * 1000", 'window.location.assign("/login")']) {
+    assert.ok(component.includes(marker), `missing ${marker}`);
+  }
 });
 
 test("sensitive API routes explicitly prevent shared caching", async () => {

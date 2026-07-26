@@ -191,6 +191,29 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
     return () => window.clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    let disposed = false;
+    async function keepSessionAlive() {
+      try {
+        const response = await fetch("/api/auth", { cache: "no-store" });
+        if (!disposed && (response.status === 401 || response.status === 403)) window.location.assign("/login");
+      } catch {
+        // Ein temporäres Netzproblem beendet keine lokale Arbeitssitzung.
+      }
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void keepSessionAlive();
+    };
+    void keepSessionAlive();
+    const interval = window.setInterval(keepSessionAlive, 30 * 60 * 1000);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
+
   const profiles = useMemo(
     () => state.roster.map((name) => profileFor(name, state.profiles[playerId(name)])),
     [state.profiles, state.roster],

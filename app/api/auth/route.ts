@@ -103,7 +103,13 @@ async function finishPasswordLogin(login: string, password: string) {
 
 export async function GET() {
   const trainer = await currentTrainer();
-  return privateJson({ mode: await authMode(), trainer: trainer ? { name: trainer.name, role: trainer.role } : null });
+  // Jede bestätigte Trainer-Abfrage verlängert die HttpOnly-Sitzung. Der Client
+  // ruft diesen Endpunkt nur bei Nutzung und beim Zurückkehren in die App auf.
+  const refreshedSession = trainer ? await createTrainerSession(trainer) : null;
+  return privateJson(
+    { mode: await authMode(), trainer: trainer ? { name: trainer.name, role: trainer.role } : null },
+    refreshedSession ? { headers: { "set-cookie": `${sessionCookieName}=${refreshedSession}; ${sessionResponse()}` } } : {},
+  );
 }
 
 export async function POST(request: Request) {

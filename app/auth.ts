@@ -11,7 +11,9 @@ export type Trainer = { email: string; name: string; role: TrainerRole };
 export type AuthMode = "pin" | "password";
 
 export const sessionCookieName = "tsg_kader_session";
-export const sessionMaxAgeSeconds = 60 * 60 * 12;
+// Trainerzugänge bleiben nach aktiver Nutzung bestehen. Die Sitzung läuft erst
+// nach 14 Tagen ohne erfolgreiche Verlängerung ab.
+export const sessionMaxAgeSeconds = 60 * 60 * 24 * 14;
 
 async function runtimeEnv(): Promise<RuntimeEnv> {
   const node = process.env as RuntimeEnv;

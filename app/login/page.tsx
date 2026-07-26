@@ -16,9 +16,6 @@ export default function LoginPage() {
   useEffect(() => {
     let active = true;
     async function prepareLogin() {
-      // Ein expliziter Aufruf der Loginseite beendet eine eventuell noch offene
-      // Sitzung eines anderen Trainers, bevor ein neuer Zugang verwendet wird.
-      await fetch("/api/auth", { method: "DELETE" });
       try {
         const response = await fetch("/api/auth", { cache: "no-store" });
         const data = await response.json() as { mode?: unknown };
