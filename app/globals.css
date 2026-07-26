@@ -855,7 +855,8 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
   .lineup-module .planner-intro { padding-top: 25px; }
   .player-card-grid { grid-template-columns: 1fr; }
   .fc-card, .fc-card-inner { height: 700px; min-height: 0; }
-  .static-card, .static-card .fc-card-inner { height: 760px; }
+  .static-card, .static-card .fc-card-inner { height: auto; min-height: 0; }
+  .static-card-content { flex: 0 0 auto; overflow: visible; }
   .static-card .fc-metrics > .season-metric { min-height: 80px; padding: 11px 10px; }
   .static-card .fc-metrics .season-metric-value { gap: 6px; }
   .static-card .season-metric-value strong { font-size: 1.3rem; }

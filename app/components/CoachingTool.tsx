@@ -1164,14 +1164,15 @@ function CalendarEventDialog({ event, onClose, onSubmit }: { event: CalendarEven
 
 function seasonStatus(key: SeasonStatKey, value: number | null): "good" | "average" | "critical" | "neutral" {
   if (value === null) return "neutral";
-  if (key === "training") return value >= 80 ? "good" : value >= 60 ? "average" : "critical";
-  return value > 0 ? "good" : "neutral";
+  if (key === "training" || key === "appearances") return value >= 80 ? "good" : value >= 60 ? "average" : "critical";
+  return "neutral";
 }
 
 function SeasonMetric({ label, value, keyName, best, progress }: { label: string; value: string | number; keyName: SeasonStatKey; best: boolean; progress?: number | null }) {
   const numeric = typeof value === "number" ? value : value === "—" ? null : Number.parseFloat(value);
   const leaderIcon = keyName === "appearances" ? "🔥" : keyName === "goals" ? "⚽" : keyName === "assists" ? "🎯" : "👑";
-  return <div className="season-metric"><div className="season-metric-value"><span className={`diagnostic-dot ${seasonStatus(keyName, Number.isFinite(numeric) ? numeric : null)}`} aria-hidden="true" /><strong>{value}</strong>{best && <span className="stat-crown" title={`Bestwert ${label}`}>{leaderIcon}</span>}</div><span>{label}</span></div>;
+  const hasTrafficLight = keyName === "appearances" || keyName === "training";
+  return <div className="season-metric"><div className="season-metric-value">{hasTrafficLight && <span className={`diagnostic-dot ${seasonStatus(keyName, Number.isFinite(numeric) ? numeric : null)}`} aria-hidden="true" />}<strong>{value}</strong>{best && <span className="stat-crown" title={`Bestwert ${label}`}>{leaderIcon}</span>}</div><span>{label}</span></div>;
 }
 
 function PlayerCard({ profile, flipped, appearances, appearanceRate, goals, assists, participation, bestSeasonStatKeys, history, bestDisciplineKeys, onFlip, onEdit, onDetails }: { profile: Profile; flipped: boolean; appearances: number; appearanceRate: number | null; goals: number; assists: number; participation: number | null; bestSeasonStatKeys: Set<SeasonStatKey>; history: Diagnostic[]; bestDisciplineKeys: Set<DiagnosticDisciplineKey>; onFlip: () => void; onEdit: () => void; onDetails: () => void }) {
