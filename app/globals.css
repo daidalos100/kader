@@ -413,8 +413,11 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .metric-best-list span, .metric-king-list span { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; gap: 7px; margin: 0; color: #d5d5d7; font-size: .7rem; font-weight: 700; letter-spacing: .015em; text-transform: none; }
 .metric-best-list b, .metric-king-list b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .metric-best-list strong, .metric-king-list strong { color: var(--white); font-size: .75rem; line-height: 1.15; letter-spacing: 0; white-space: nowrap; }
-.metric-best-list span { grid-template-columns: auto minmax(0, 1fr); font-size: .78rem; }
-.metric-best-list strong { overflow: hidden; text-overflow: ellipsis; font-size: .84rem; }
+.metric-best-list span { grid-template-columns: auto auto minmax(0, 1fr); font-size: .69rem; }
+.metric-best-list span > b { font-size: .82rem; line-height: 1; }
+.metric-best-list span > em { color: #b7b9bf; font-style: normal; white-space: nowrap; }
+.metric-best-list strong { overflow: hidden; color: var(--white); text-overflow: ellipsis; font-size: .76rem; }
+.metric-best-empty { display: block; color: #8f9197; font-size: .72rem; }
 .metric-king-list { gap: 4px; margin-top: 12px; }
 .metric-king-list span { grid-template-columns: 1fr auto; font-size: .68rem; }
 .metric-king-list strong { color: #8ee59f; }
@@ -623,9 +626,8 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
 .stats-table td { padding: 13px 15px; border-top: 1px solid rgba(244,243,239,.09); color: #c7c7c8; }
 .stats-table td:first-child { display: flex; align-items: center; gap: 10px; color: var(--white); }
 .stats-award-heading { min-width: 164px; }
-.stats-award-cell { min-width: 164px; }
-.stats-award { display: flex; width: max-content; align-items: center; min-height: 25px; padding: 4px 7px; border: 1px solid rgba(244,243,239,.15); background: rgba(244,243,239,.045); color: #e8e8ea; font-size: .63rem; font-weight: 750; line-height: 1.15; white-space: nowrap; }
-.stats-award + .stats-award { margin-top: 5px; }
+.stats-award-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; min-width: 132px; }
+.stats-award { display: inline-grid; width: 34px; height: 34px; place-items: center; border: 1px solid rgba(244,243,239,.15); background: rgba(244,243,239,.045); color: #e8e8ea; font-size: 1.08rem; line-height: 1; }
 .stats-award-dream-duo { border-color: rgba(135,184,255,.38); background: rgba(83,137,220,.11); }
 .stats-award-clean-sheet { border-color: rgba(100,201,168,.4); background: rgba(58,148,120,.11); }
 .stats-award-comeback { border-color: rgba(126,219,134,.42); background: rgba(85,185,93,.11); }
