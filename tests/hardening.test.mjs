@@ -174,7 +174,9 @@ test("statistics awards stay derived from saved training, lineup and match data"
     assert.ok(component.includes(marker), `missing ${marker}`);
   }
   assert.ok(component.includes("const orderedAwards"));
-  for (const marker of ["stats-award-comeback", "stats-award-upward-trend", "stats-award-chain", "stats-award-bollwerk", "stats-award-scorer-hero", "stats-award-legend"]) {
+  assert.ok(component.includes('header("award", "Award")'));
+  assert.ok(component.includes("awardCountFor"));
+  for (const marker of ["stats-award-cell", "stats-award-dream-duo", "stats-award-legend"]) {
     assert.ok(css.includes(marker), `missing ${marker}`);
   }
 });

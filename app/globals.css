@@ -628,12 +628,6 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
 .stats-award-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 132px; }
 .stats-award { display: inline-flex; align-items: center; justify-content: center; min-width: 25px; color: #e8e8ea; font-size: 1.2rem; line-height: 1; }
 .stats-award-dream-duo { gap: 4px; min-width: 0; color: var(--white); font-size: .76rem; font-weight: 800; white-space: nowrap; }
-.stats-award-clean-sheet { border-color: rgba(100,201,168,.4); background: rgba(58,148,120,.11); }
-.stats-award-comeback { border-color: rgba(126,219,134,.42); background: rgba(85,185,93,.11); }
-.stats-award-upward-trend { border-color: rgba(115,194,255,.42); background: rgba(73,144,219,.11); }
-.stats-award-chain { border-color: rgba(202,187,153,.42); background: rgba(156,133,87,.11); }
-.stats-award-bollwerk { border-color: rgba(166,184,215,.42); background: rgba(103,124,166,.11); }
-.stats-award-scorer-hero { border-color: rgba(255,212,108,.45); background: rgba(203,153,36,.11); }
 .stats-award-legend { margin-top: clamp(38px, 6vw, 72px); padding-top: 18px; border-top: 1px solid rgba(244,243,239,.15); }
 .stats-award-legend h2 { margin: 7px 0 22px; font-size: clamp(1.5rem, 3vw, 2.2rem); text-transform: uppercase; }
 .stats-award-legend > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; border: 1px solid rgba(244,243,239,.14); background: rgba(244,243,239,.14); }
