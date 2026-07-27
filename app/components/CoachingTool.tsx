@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SquadPlanner from "./SquadPlanner";
 import TacticsBoard, { CustomTactic, TacticEntry, TacticLayout, TacticTemplate } from "./TacticsBoard";
 import type { CalendarEvent } from "../lib/calendar";
@@ -257,6 +257,17 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
     () => state.roster.map((name) => profileFor(name, state.profiles[playerId(name)])),
     [state.profiles, state.roster],
   );
+  // Der private Historienimport stammt aus einem älteren Datenmodell. Dort
+  // können Spieler-IDs noch einen Nachnamen enthalten (z. B. "juls-duerr").
+  // Die aktuelle D1 verwendet eindeutige Vornamen als IDs. Beide Varianten
+  // werden deshalb zuverlässig derselben Spielkarte zugeordnet.
+  const historyForProfile = useCallback((profile: Profile) => {
+    const exact = playerSeasonHistory[profile.id] ?? [];
+    const legacyMatches = Object.entries(playerSeasonHistory)
+      .filter(([historyPlayerId]) => historyPlayerId !== profile.id && (historyPlayerId.startsWith(profile.id) || profile.id.startsWith(historyPlayerId)))
+      .flatMap(([, records]) => records);
+    return [...exact, ...legacyMatches].sort((left, right) => right.seasonId.localeCompare(left.seasonId));
+  }, [playerSeasonHistory]);
   const calendarEvents = useMemo(() => events
     .map((event) => ({ ...event, ...(state.calendarOverrides[event.id] ?? {}) }))
     .filter((event) => new Date(event.start).getTime() >= calendarVisibleFrom)
@@ -1036,7 +1047,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
                 {sortedCardRows.map(({ player, appearances, goals, assists, participation }) => {
                   const history = state.diagnostics[player.id] ?? [];
                   const appearanceRate = totalMatches ? Math.round((appearances / totalMatches) * 100) : null;
-                  return <StaticPlayerCard key={player.id} profile={player} appearanceRate={appearanceRate} goals={goals} assists={assists} participation={participation} bestSeasonStatKeys={seasonStatBestByPlayer[player.id] ?? new Set()} history={history} seasonHistory={playerSeasonHistory[player.id] ?? []} bestDisciplineKeys={diagnosticBestByPlayer[player.id] ?? new Set()} onEdit={() => setEditingProfile(player)} onDetails={() => setDetailPlayer(player)} />;
+                  return <StaticPlayerCard key={player.id} profile={player} appearanceRate={appearanceRate} goals={goals} assists={assists} participation={participation} bestSeasonStatKeys={seasonStatBestByPlayer[player.id] ?? new Set()} history={history} seasonHistory={historyForProfile(player)} bestDisciplineKeys={diagnosticBestByPlayer[player.id] ?? new Set()} onEdit={() => setEditingProfile(player)} onDetails={() => setDetailPlayer(player)} />;
                 })}
               </div>
             </section>
@@ -1054,7 +1065,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
 
       {editingCalendarEvent && <CalendarEventDialog event={editingCalendarEvent} onClose={() => setEditingCalendarEvent(null)} onSubmit={saveCalendarEvent} />}
 
-      {editingProfile && <ProfileDialog profile={editingProfile} seasonHistory={playerSeasonHistory[editingProfile.id] ?? []} onClose={() => setEditingProfile(null)} onSubmit={saveProfile} />}
+      {editingProfile && <ProfileDialog profile={editingProfile} seasonHistory={historyForProfile(editingProfile)} onClose={() => setEditingProfile(null)} onSubmit={saveProfile} />}
       {detailPlayer && <DiagnosticDetailsDialog profile={detailPlayer} history={state.diagnostics[detailPlayer.id] ?? []} bestDisciplineKeys={diagnosticBestByPlayer[detailPlayer.id] ?? new Set()} onClose={() => setDetailPlayer(null)} />}
     </main>
   );
