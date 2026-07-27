@@ -162,7 +162,7 @@ test("diagnostic cards support imported metrics without embedding player data", 
 
 test("statistics show percentage appearances and event-level details", async () => {
   const component = await source("app/components/CoachingTool.tsx");
-  for (const marker of ["StatDetailsDialog", "appearanceEvents", "trainingEvents", "`${appearanceRate}%`", "stats-value-button", "defaultSort", "trainingDifference", "appearanceDifference", "goalDifference", "assistDifference"]) {
+  for (const marker of ["StatDetailsDialog", "appearanceEvents", "trainingEvents", "isTrainingExcludedFromStatistics", "bwSchoolHolidayRanges", "2026-07-30", "2030-09-07", "`${appearanceRate}%`", "stats-value-button", "defaultSort", "trainingDifference", "appearanceDifference", "goalDifference", "assistDifference"]) {
     assert.ok(component.includes(marker), `missing ${marker}`);
   }
 });

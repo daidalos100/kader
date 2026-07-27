@@ -169,6 +169,21 @@ function eventLineupId(event: CalendarEvent) {
 const defensivePositions = new Set(["TW", "LV", "IV", "RV"]);
 const recordedTrainingStatuses = new Set<AttendanceStatus>(["present", "excused", "absent"]);
 
+// Baden-Württemberg: Die Termine bleiben im Kalender erhalten und bearbeitbar,
+// zählen aber nicht als reguläre Trainingszeit in Quoten, Awards oder Details.
+const bwSchoolHolidayRanges = [
+  ["2026-03-30", "2026-04-11"], ["2026-05-26", "2026-06-05"], ["2026-07-30", "2026-09-12"], ["2026-10-26", "2026-10-31"], ["2026-12-22", "2027-01-09"],
+  ["2027-03-25", "2027-03-25"], ["2027-03-30", "2027-04-03"], ["2027-05-18", "2027-05-29"], ["2027-07-29", "2027-09-11"], ["2027-11-02", "2027-11-06"], ["2027-12-23", "2028-01-08"],
+  ["2028-04-13", "2028-04-13"], ["2028-04-18", "2028-04-22"], ["2028-06-06", "2028-06-17"], ["2028-07-27", "2028-09-09"], ["2028-10-30", "2028-11-03"], ["2028-12-23", "2029-01-05"],
+  ["2029-03-26", "2029-04-07"], ["2029-05-22", "2029-06-01"], ["2029-07-26", "2029-09-08"], ["2029-10-29", "2029-11-02"], ["2029-12-22", "2030-01-05"],
+  ["2030-04-15", "2030-04-26"], ["2030-06-11", "2030-06-21"], ["2030-07-25", "2030-09-07"],
+] as const;
+
+function isTrainingExcludedFromStatistics(event: CalendarEvent) {
+  const date = event.start.slice(0, 10);
+  return bwSchoolHolidayRanges.some(([from, until]) => date >= from && date <= until);
+}
+
 function playerFromLineupEntry(entry: { id?: string; firstName?: string }, profiles: Profile[]) {
   return profiles.find((item) => item.id === entry.id)
     ?? profiles.find((item) => item.firstName.localeCompare(entry.firstName?.trim() ?? "", "de", { sensitivity: "base" }) === 0);
@@ -606,7 +621,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
     let appearances = 0; let goals = 0; let assists = 0; let present = 0; let recorded = 0;
     const goalEvents: StatEventDetail[] = [];
     const assistEvents: StatEventDetail[] = [];
-    const trainingEvents: StatEventDetail[] = calendarEvents.filter((event) => event.type === "training").map((event) => {
+    const trainingEvents: StatEventDetail[] = calendarEvents.filter((event) => event.type === "training" && !isTrainingExcludedFromStatistics(event)).map((event) => {
       const status = state.attendance[event.id]?.[player.id];
       const reason = status === "excused" ? state.attendanceReasons[event.id]?.[player.id] : undefined;
       if (status) {
@@ -686,7 +701,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
     // Comeback: In den fünf erfassten Trainings vor einer fünf Termine langen Anwesenheitsserie
     // müssen mindestens drei Abwesenheiten liegen. Nicht erfasste Termine werden nicht interpretiert.
     const completedTrainingEvents = calendarEvents
-      .filter((event) => event.type === "training" && new Date(event.start).getTime() <= Date.now())
+      .filter((event) => event.type === "training" && !isTrainingExcludedFromStatistics(event) && new Date(event.start).getTime() <= Date.now())
       .sort((left, right) => left.start.localeCompare(right.start));
     profiles.forEach((player) => {
       const attendanceSeries = completedTrainingEvents
@@ -794,7 +809,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
     const calculate = (from: number, to: number) => {
       const trainingEvents = calendarEvents.filter((event) => {
         const time = new Date(event.start).getTime();
-        return event.type === "training" && time >= from && time < to;
+        return event.type === "training" && !isTrainingExcludedFromStatistics(event) && time >= from && time < to;
       });
       let present = 0;
       let recorded = 0;
