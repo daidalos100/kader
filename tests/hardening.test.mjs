@@ -121,15 +121,11 @@ test("matchday capture offers every present player, independent of the lineup", 
   assert.ok(!component.includes("Aufstellung noch nicht vorhanden."));
 });
 
-test("appearances are derived from saved matchday lineups", async () => {
-  const [component, route] = await Promise.all([
-    source("app/components/CoachingTool.tsx"), source("app/api/lineup/route.ts"),
-  ]);
-  for (const marker of ["eventLineups", "appearanceCounts", "eligibleEventLineupIds", "entry.firstName", "matchday-result"]) {
+test("appearances are derived from recorded matchday attendance", async () => {
+  const component = await source("app/components/CoachingTool.tsx");
+  for (const marker of ["eligibleAppearanceEvents", "appearanceCounts", 'status === "present"', "Entschuldigt${reason", "matchday-result"]) {
     assert.ok(component.includes(marker), `missing ${marker}`);
   }
-  assert.ok(route.includes('params.get("eventLineups")'));
-  assert.ok(route.includes("lineup_id=like.event-*"));
   assert.ok(component.includes("const seasonStart = calendarVisibleFrom"), "all D1 game dates from 07.07.2026 must count");
 });
 

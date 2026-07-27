@@ -545,29 +545,27 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
 
   const gameEvents = useMemo(() => calendarEvents
     .filter((event) => (event.type === "game" || event.type === "tournament") && new Date(event.start).getTime() >= seasonStart), [calendarEvents]);
-  const eligibleEventLineupIds = useMemo(() => gameEvents.map(eventLineupId), [gameEvents]);
   const calendarEventById = useMemo(() => new Map(calendarEvents.map((event) => [event.id, event])), [calendarEvents]);
+  // Einsätze folgen der erfassten Teilnahme am Spiel- bzw. Turniertag – nicht der
+  // taktischen Aufstellung. So bleiben Wechsel, mehrere Startaufstellungen und
+  // nachträgliche Taktikänderungen von der Saisonstatistik getrennt.
+  const eligibleAppearanceEvents = useMemo(() => gameEvents.filter((event) =>
+    Object.keys(state.attendance[event.id] ?? {}).length > 0
+  ), [gameEvents, state.attendance]);
   const appearanceEventsByPlayer = useMemo(() => {
     const appearances: Record<string, StatEventDetail[]> = {};
-    gameEvents.forEach((event) => {
-      const lineupId = eventLineupId(event);
-      const used = new Set<string>();
-      Object.values(eventLineups[lineupId] ?? {}).flat().forEach((entry) => {
-        const player = profiles.find((item) => item.id === entry.id)
-          ?? profiles.find((item) => item.firstName.localeCompare(entry.firstName?.trim() ?? "", "de", { sensitivity: "base" }) === 0);
-        if (player) used.add(player.id);
-      });
-      const lineupSaved = used.size > 0;
+    eligibleAppearanceEvents.forEach((event) => {
       profiles.forEach((player) => {
-        const attendanceStatus = state.attendance[event.id]?.[player.id];
-        const detail = used.has(player.id) ? "Im Kader" : attendanceStatus === "not_selected" ? "Nicht im Kader" : lineupSaved ? "Nicht im Kader" : "Noch nicht geplant";
+        const status = state.attendance[event.id]?.[player.id];
+        const reason = status === "excused" ? state.attendanceReasons[event.id]?.[player.id] : undefined;
+        const detail = status === "present" ? "Anwesend" : status === "excused" ? `Entschuldigt${reason ? ` (${reason})` : ""}` : status === "not_selected" ? "Nicht im Kader" : status === "absent" ? "Abwesend" : "Noch nicht erfasst";
         (appearances[player.id] ??= []).push({ eventId: event.id, title: event.title, date: formatDate(event.start, false), detail });
       });
     });
     return appearances;
-  }, [gameEvents, eventLineups, profiles, state.attendance]);
-  const appearanceCounts = useMemo(() => Object.fromEntries(Object.entries(appearanceEventsByPlayer).map(([id, events]) => [id, events.filter((event) => event.detail === "Im Kader").length])), [appearanceEventsByPlayer]);
-  const totalMatches = eligibleEventLineupIds.filter((lineupId) => Object.values(eventLineups[lineupId] ?? {}).some((players) => players.length > 0)).length;
+  }, [eligibleAppearanceEvents, profiles, state.attendance, state.attendanceReasons]);
+  const appearanceCounts = useMemo(() => Object.fromEntries(Object.entries(appearanceEventsByPlayer).map(([id, events]) => [id, events.filter((event) => event.detail === "Anwesend").length])), [appearanceEventsByPlayer]);
+  const totalMatches = eligibleAppearanceEvents.length;
   const statsRows = profiles.map((player) => {
     let appearances = 0; let goals = 0; let assists = 0; let present = 0; let recorded = 0;
     const goalEvents: StatEventDetail[] = [];
@@ -1025,7 +1023,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
 
           {tab === "stats" && (
             <section className="coach-view">
-              <div className="view-heading compact"><div><p className="section-index">SPIELE &amp; ENTWICKLUNG</p><h1>Statistik.</h1><p>Spielwerte werden pro Kalendertermin erfasst und automatisch summiert.</p></div></div>
+              <div className="view-heading compact"><div><p className="section-index">SPIELE &amp; ENTWICKLUNG</p><h1>Statistik.</h1><p>Trainings- und Einsatzquoten folgen den erfassten Teilnahmen. Tore und Assists werden pro Spieltag summiert.</p></div></div>
               <div className="stats-table-wrap"><StatsTable rows={statsRows} totalMatches={totalMatches} awardsByPlayer={awardsByPlayer} /></div>
               <StatsAwardLegend />
             </section>
