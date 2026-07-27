@@ -34,10 +34,10 @@ export async function GET() {
   try {
     const response = await fetch(
       `${url}/rest/v1/player_season_history?select=player_id,season_id,season_label,team_label,training_present_count,training_rate_percent,appearance_count,appearance_opportunities,goals&order=season_id.desc`,
-      // Die Historie ist durch RLS geschützt. Der serverseitige Secret-Key
-      // muss daher sowohl als API-Key als auch explizit als Bearer-Token
-      // übermittelt werden. So bleibt die Tabelle für Browserzugriffe privat.
-      { headers: { ...supabaseHeaders(key), authorization: `Bearer ${key}` }, cache: "no-store" },
+      // Neue Supabase-Secret-Keys werden über den API-Key-Header autorisiert.
+      // Ein zusätzlicher Bearer-Header mit diesem Key wird vom Auth-Gateway
+      // abgewiesen. Die Tabelle bleibt durch RLS für Browserzugriffe privat.
+      { headers: supabaseHeaders(key), cache: "no-store" },
     );
     // Die Historie ist eine optionale Erweiterung. Bis die einmalige SQL-Migration
     // ausgeführt wurde, bleibt das Coaching Tool deshalb vollständig nutzbar.
