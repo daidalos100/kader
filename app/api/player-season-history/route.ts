@@ -34,11 +34,18 @@ export async function GET() {
   try {
     const response = await fetch(
       `${url}/rest/v1/player_season_history?select=player_id,season_id,season_label,team_label,training_present_count,training_rate_percent,appearance_count,appearance_opportunities,goals&order=season_id.desc`,
-      { headers: supabaseHeaders(key), cache: "no-store" },
+      // Die Historie ist durch RLS geschützt. Der serverseitige Secret-Key
+      // muss daher sowohl als API-Key als auch explizit als Bearer-Token
+      // übermittelt werden. So bleibt die Tabelle für Browserzugriffe privat.
+      { headers: { ...supabaseHeaders(key), authorization: `Bearer ${key}` }, cache: "no-store" },
     );
     // Die Historie ist eine optionale Erweiterung. Bis die einmalige SQL-Migration
     // ausgeführt wurde, bleibt das Coaching Tool deshalb vollständig nutzbar.
-    if (!response.ok) return privateJson({ records: [], connected: true, setupRequired: true });
+    if (!response.ok) {
+      const detail = await response.text();
+      console.error("player_season_history_read_failed", { status: response.status, detail: detail.slice(0, 500) });
+      return privateJson({ error: "Historische Saisonwerte konnten nicht geladen werden.", records: [], connected: true, setupRequired: true }, { status: 502 });
+    }
     const rows = (await response.json()) as SeasonHistoryRow[];
     const records = rows.flatMap((row) => {
       if (typeof row.player_id !== "string" || typeof row.season_id !== "string" || typeof row.season_label !== "string" || typeof row.team_label !== "string") return [];
