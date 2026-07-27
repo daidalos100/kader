@@ -190,3 +190,18 @@ test("player card back keeps details accessible on constrained screens", async (
     assert.ok(css.includes(marker) || component.includes(marker), `missing ${marker}`);
   }
 });
+
+test("team cards render historical seasons through an access-controlled history endpoint", async () => {
+  const [component, route, migration, css] = await Promise.all([
+    source("app/components/CoachingTool.tsx"), source("app/api/player-season-history/route.ts"), source("supabase/phase6-season-history.sql"), source("app/globals.css"),
+  ]);
+  for (const marker of ["PlayerSeasonHistory", "SeasonHistoryOverview", "SAISON 2026/27 · D1", "SAISONVERLAUF", "playerSeasonHistory"]) {
+    assert.ok(component.includes(marker), `missing ${marker}`);
+  }
+  assert.ok(route.includes("isAuthenticated"));
+  assert.ok(route.includes("private, no-store"));
+  assert.ok(migration.includes("create table if not exists public.player_season_history"));
+  assert.ok(migration.includes("enable row level security"));
+  assert.ok(!migration.includes("('Tom'"));
+  assert.ok(css.includes(".season-history-overview"));
+});

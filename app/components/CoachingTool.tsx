@@ -51,6 +51,17 @@ type StatSortKey = "player" | "appearances" | "goals" | "assists" | "training" |
 type StatEventDetail = { eventId: string; title: string; date: string; detail: string };
 type StatAwardKind = "training-leader" | "appearance-leader" | "goals-leader" | "assists-leader" | "dream-duo" | "clean-sheet" | "comeback" | "upward-trend" | "chain" | "bollwerk" | "scorer-hero";
 type StatAward = { kind: StatAwardKind; label: string; title: string };
+type PlayerSeasonHistory = {
+  playerId: string;
+  seasonId: string;
+  seasonLabel: string;
+  teamLabel: string;
+  trainingPresentCount: number | null;
+  trainingRatePercent: number | null;
+  appearanceCount: number | null;
+  appearanceOpportunities: number | null;
+  goals: number | null;
+};
 type CalendarEventOverride = Pick<CalendarEvent, "id" | "uid" | "title" | "start" | "end" | "allDay" | "location" | "description" | "type">;
 type CoachingState = {
   roster: string[];
@@ -207,6 +218,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
   const [newRosterName, setNewRosterName] = useState("");
   const [positionFilter, setPositionFilter] = useState("all");
   const [eventLineups, setEventLineups] = useState<Record<string, SavedLineup>>({});
+  const [playerSeasonHistory, setPlayerSeasonHistory] = useState<Record<string, PlayerSeasonHistory[]>>({});
   const [editingCalendarEvent, setEditingCalendarEvent] = useState<CalendarEvent | null>(null);
   const [referenceTime, setReferenceTime] = useState(() => overviewReferenceTime());
   const calendarListRef = useRef<HTMLDivElement>(null);
@@ -299,11 +311,20 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
         const data = await response.json() as { lineups?: Record<string, SavedLineup> };
         return data.lineups ?? {};
       }),
+      fetch("/api/player-season-history", { cache: "no-store" }).then(async (response) => {
+        if (!response.ok) return [] as PlayerSeasonHistory[];
+        const data = await response.json() as { records?: PlayerSeasonHistory[] };
+        return Array.isArray(data.records) ? data.records : [];
+      }),
     ])
-      .then(([calendarEvents, coaching, lineupNames, savedEventLineups]) => {
+      .then(([calendarEvents, coaching, lineupNames, savedEventLineups, historyRecords]) => {
         if (cancelled) return;
         setEvents(calendarEvents);
         setEventLineups(savedEventLineups);
+        setPlayerSeasonHistory(historyRecords.reduce<Record<string, PlayerSeasonHistory[]>>((grouped, record) => {
+          (grouped[record.playerId] ??= []).push(record);
+          return grouped;
+        }, {}));
         const normalized = normalizeState(coaching.state, lineupNames);
         setState(normalized);
         const nextRevisions = coaching.revisions ?? {};
@@ -1015,7 +1036,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
                 {sortedCardRows.map(({ player, appearances, goals, assists, participation }) => {
                   const history = state.diagnostics[player.id] ?? [];
                   const appearanceRate = totalMatches ? Math.round((appearances / totalMatches) * 100) : null;
-                  return <StaticPlayerCard key={player.id} profile={player} appearanceRate={appearanceRate} goals={goals} assists={assists} participation={participation} bestSeasonStatKeys={seasonStatBestByPlayer[player.id] ?? new Set()} history={history} bestDisciplineKeys={diagnosticBestByPlayer[player.id] ?? new Set()} onEdit={() => setEditingProfile(player)} onDetails={() => setDetailPlayer(player)} />;
+                  return <StaticPlayerCard key={player.id} profile={player} appearanceRate={appearanceRate} goals={goals} assists={assists} participation={participation} bestSeasonStatKeys={seasonStatBestByPlayer[player.id] ?? new Set()} history={history} seasonHistory={playerSeasonHistory[player.id] ?? []} bestDisciplineKeys={diagnosticBestByPlayer[player.id] ?? new Set()} onEdit={() => setEditingProfile(player)} onDetails={() => setDetailPlayer(player)} />;
                 })}
               </div>
             </section>
@@ -1177,8 +1198,21 @@ function PlayerCard({ profile, flipped, appearances, appearanceRate, goals, assi
   return <article className={`fc-card${flipped ? " flipped" : ""}`}><div className="fc-card-inner"><div className="fc-face fc-front"><button type="button" className="card-flip-area" onClick={onFlip} aria-label={`${profile.firstName}: Leistungsseite anzeigen`}><div className="shirt-number">{profile.shirtNumber || "—"}</div><Image src={`/api/player-image?name=${encodeURIComponent(profile.firstName)}`} alt={profile.firstName} width={260} height={260} unoptimized /><div className="fc-name">{profile.firstName}</div><div className="fc-positions"><strong>{profile.primaryPosition || "POS"}</strong><span>{profile.secondaryPosition || "—"}</span></div><div className="fc-foot">Starker Fuß <strong>{{ left: "Links", right: "Rechts", both: "Beide", "": "—" }[profile.strongFoot]}</strong></div><p>{profile.personality || "Spielerpersönlichkeit noch nicht ergänzt."}</p></button><button type="button" className="card-edit" onClick={(event) => { event.stopPropagation(); onEdit(); }}>Profil bearbeiten</button></div><div className="fc-face fc-back"><button type="button" className="card-flip-area" onClick={onFlip} aria-label={`${profile.firstName}: Profilseite anzeigen`}><p className="section-index">SAISONWERTE</p><h3>{profile.firstName}</h3><div className="fc-metrics"><SeasonMetric label="Einsätze" value={appearanceRate === null ? "—" : `${appearanceRate}%`} keyName="appearances" best={bestSeasonStatKeys.has("appearances")} progress={appearanceRate} /><SeasonMetric label="Training" value={participation === null ? "—" : `${participation}%`} keyName="training" best={bestSeasonStatKeys.has("training")} progress={participation} /><SeasonMetric label="Tore" value={goals} keyName="goals" best={bestSeasonStatKeys.has("goals")} /><SeasonMetric label="Assists" value={assists} keyName="assists" best={bestSeasonStatKeys.has("assists")} /></div><DiagnosticOverview latest={history[0]} bestDisciplineKeys={bestDisciplineKeys} /></button><button type="button" className="card-edit diagnostic-details-button" onClick={(event) => { event.stopPropagation(); onDetails(); }}>Details ansehen</button></div></div></article>;
 }
 
-function StaticPlayerCard({ profile, appearanceRate, goals, assists, participation, bestSeasonStatKeys, history, bestDisciplineKeys, onEdit, onDetails }: { profile: Profile; appearanceRate: number | null; goals: number; assists: number; participation: number | null; bestSeasonStatKeys: Set<SeasonStatKey>; history: Diagnostic[]; bestDisciplineKeys: Set<DiagnosticDisciplineKey>; onEdit: () => void; onDetails: () => void }) {
-  return <article className="fc-card static-card"><div className="fc-card-inner"><section className="fc-face static-face"><div className="static-card-content"><div className="shirt-number">{profile.shirtNumber || "—"}</div><Image src={`/api/player-image?name=${encodeURIComponent(profile.firstName)}&v=20260723`} alt={profile.firstName} width={260} height={260} unoptimized /><div className="fc-name">{profile.firstName}</div><div className="fc-positions"><strong>{profile.primaryPosition || "POS"}</strong><span>{profile.secondaryPosition || "—"}</span></div><div className="fc-foot">Starker Fuß <strong>{{ left: "Links", right: "Rechts", both: "Beide", "": "—" }[profile.strongFoot]}</strong></div><p className="section-index">SAISONWERTE</p><div className="fc-metrics"><SeasonMetric label="Einsätze" value={appearanceRate === null ? "—" : `${appearanceRate}%`} keyName="appearances" best={bestSeasonStatKeys.has("appearances")} progress={appearanceRate} /><SeasonMetric label="Training" value={participation === null ? "—" : `${participation}%`} keyName="training" best={bestSeasonStatKeys.has("training")} progress={participation} /><SeasonMetric label="Tore" value={goals} keyName="goals" best={bestSeasonStatKeys.has("goals")} /><SeasonMetric label="Assists" value={assists} keyName="assists" best={bestSeasonStatKeys.has("assists")} /></div><DiagnosticOverview latest={history[0]} previous={history[1]} bestDisciplineKeys={bestDisciplineKeys} compact /></div><div className="static-card-actions"><button type="button" className="card-edit" onClick={onEdit}>Profil</button><button type="button" className="card-edit diagnostic-details-button" onClick={onDetails}>Leistung</button></div></section></div></article>;
+function SeasonHistoryOverview({ records }: { records: PlayerSeasonHistory[] }) {
+  if (!records.length) return null;
+  return <section className="season-history-overview" aria-label="Vergangene Saisonwerte">
+    <strong>SAISONVERLAUF</strong>
+    {records.map((record) => {
+      const training = record.trainingRatePercent === null ? "—" : `${record.trainingRatePercent}%${record.trainingPresentCount === null ? "" : ` · ${record.trainingPresentCount}×`}`;
+      const appearances = record.appearanceCount === null ? "—" : `${record.appearanceCount}${record.appearanceOpportunities === null ? "" : `/${record.appearanceOpportunities}`}`;
+      const scoringRate = record.goals !== null && record.appearanceCount && record.appearanceCount > 0 ? (record.goals / record.appearanceCount).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
+      return <article key={record.seasonId}><header><b>{record.seasonLabel} · {record.teamLabel}</b><span>Abgeschlossen</span></header><div><span><small>Training</small><b>{training}</b></span><span><small>Einsätze</small><b>{appearances}</b></span><span><small>Tore</small><b>{record.goals ?? "—"}</b></span><span><small>Ø Tore</small><b>{scoringRate}</b></span></div></article>;
+    })}
+  </section>;
+}
+
+function StaticPlayerCard({ profile, appearanceRate, goals, assists, participation, bestSeasonStatKeys, history, seasonHistory, bestDisciplineKeys, onEdit, onDetails }: { profile: Profile; appearanceRate: number | null; goals: number; assists: number; participation: number | null; bestSeasonStatKeys: Set<SeasonStatKey>; history: Diagnostic[]; seasonHistory: PlayerSeasonHistory[]; bestDisciplineKeys: Set<DiagnosticDisciplineKey>; onEdit: () => void; onDetails: () => void }) {
+  return <article className="fc-card static-card"><div className="fc-card-inner"><section className="fc-face static-face"><div className="static-card-content"><div className="shirt-number">{profile.shirtNumber || "—"}</div><Image src={`/api/player-image?name=${encodeURIComponent(profile.firstName)}&v=20260723`} alt={profile.firstName} width={260} height={260} unoptimized /><div className="fc-name">{profile.firstName}</div><div className="fc-positions"><strong>{profile.primaryPosition || "POS"}</strong><span>{profile.secondaryPosition || "—"}</span></div><div className="fc-foot">Starker Fuß <strong>{{ left: "Links", right: "Rechts", both: "Beide", "": "—" }[profile.strongFoot]}</strong></div><p className="section-index">SAISON 2026/27 · D1</p><div className="fc-metrics"><SeasonMetric label="Einsätze" value={appearanceRate === null ? "—" : `${appearanceRate}%`} keyName="appearances" best={bestSeasonStatKeys.has("appearances")} progress={appearanceRate} /><SeasonMetric label="Training" value={participation === null ? "—" : `${participation}%`} keyName="training" best={bestSeasonStatKeys.has("training")} progress={participation} /><SeasonMetric label="Tore" value={goals} keyName="goals" best={bestSeasonStatKeys.has("goals")} /><SeasonMetric label="Assists" value={assists} keyName="assists" best={bestSeasonStatKeys.has("assists")} /></div><SeasonHistoryOverview records={seasonHistory} /><DiagnosticOverview latest={history[0]} previous={history[1]} bestDisciplineKeys={bestDisciplineKeys} compact /></div><div className="static-card-actions"><button type="button" className="card-edit" onClick={onEdit}>Profil</button><button type="button" className="card-edit diagnostic-details-button" onClick={onDetails}>Leistung</button></div></section></div></article>;
 }
 
 type DiagnosticStatus = "good" | "mid-good" | "average" | "below" | "critical" | "bad" | "neutral";

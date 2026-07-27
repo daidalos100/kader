@@ -534,6 +534,16 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .static-card .diagnostic-overview-compact > div > .diagnostic-dot { flex: 0 0 10px; width: 10px; height: 10px; }
 .static-card .diagnostic-overview-compact > div > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .static-card .diagnostic-overview-compact .diagnostic-crown { margin-left: 3px; font-size: .72rem; }
+.season-history-overview { display: grid; gap: 7px; width: 100%; margin-top: 11px; padding-top: 10px; border-top: 1px solid rgba(244,243,239,.11); }
+.season-history-overview > strong { color: #f2f1ee; font-size: .58rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.season-history-overview article { display: grid; gap: 7px; padding: 9px; border: 1px solid rgba(244,243,239,.11); background: rgba(255,255,255,.025); }
+.season-history-overview article header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.season-history-overview article header b { color: #f2f1ee; font-size: .68rem; font-weight: 900; }
+.season-history-overview article header span { color: #888a90; font-size: .49rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.season-history-overview article > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.season-history-overview article > div > span { display: grid; gap: 3px; min-width: 0; }
+.season-history-overview small { overflow: hidden; color: #888a90; font-size: .47rem; font-weight: 800; letter-spacing: .04em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.season-history-overview article > div b { overflow: hidden; color: #e8e7e3; font-size: .68rem; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
 .fc-metrics span { color: #85878d; font-size: .58rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .diagnostic-overview { display: grid; gap: 0; width: 100%; margin-top: 12px; }
 .diagnostic-overview > strong { margin-bottom: 5px; font-size: .65rem; letter-spacing: .08em; text-transform: uppercase; }
@@ -863,6 +873,9 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
   .static-card .fc-metrics > .season-metric { min-height: 80px; padding: 11px 10px; }
   .static-card .fc-metrics .season-metric-value { gap: 6px; }
   .static-card .season-metric-value strong { font-size: 1.3rem; }
+  .season-history-overview article { padding: 10px 8px; }
+  .season-history-overview article > div { gap: 4px; }
+  .season-history-overview article > div b { font-size: .67rem; }
   .card-flip-area > img { width: min(260px, 80%); }
   .form-grid { grid-template-columns: 1fr; }
   .form-grid .wide { grid-column: auto; }
