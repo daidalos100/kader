@@ -980,3 +980,59 @@ body.matchday-focus .matchday-focus-button:hover, body.matchday-focus .matchday-
     padding-bottom: 0;
   }
 }
+
+
+/* Accessibility and mobile reading refinements. */
+.stats-scroll-hint { display: none; }
+.stats-table th { color: #9da0a8; }
+.diagnostic-overview > p, .history-summary > div > p:last-child { color: #989aa1; }
+
+/* Static team cards are content-led when the responsive layout activates.
+   The visual card remains fixed on large screens, while zoom and mobile text
+   can never be clipped by the card shell. */
+@media (max-width: 820px) {
+  .static-card,
+  .static-card .fc-card-inner,
+  .static-card .static-face {
+    height: auto;
+    min-height: 0;
+  }
+
+  .static-card .static-face,
+  .static-card-content {
+    overflow: visible;
+  }
+}
+
+@media (max-width: 560px) {
+  .stats-table-wrap { position: relative; }
+  .stats-table { min-width: 620px; }
+  .stats-table th:first-child,
+  .stats-table td:first-child {
+    position: sticky;
+    left: 0;
+    background: #101115;
+    box-shadow: 10px 0 16px rgba(8, 9, 12, .72);
+  }
+  .stats-table th:first-child { z-index: 3; }
+  .stats-table td:first-child { z-index: 2; }
+  .stats-scroll-hint {
+    position: absolute;
+    z-index: 4;
+    top: 7px;
+    right: 7px;
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    margin: 0;
+    padding: 0 7px;
+    border: 1px solid rgba(244, 243, 239, .16);
+    background: rgba(16, 17, 21, .9);
+    color: #b8bac0;
+    font-size: .48rem;
+    font-weight: 800;
+    letter-spacing: .04em;
+    pointer-events: none;
+    text-transform: uppercase;
+  }
+}
