@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, KeyboardEvent, PointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, PointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Player = { id: string; firstName: string };
 type Lineup = Record<string, Player[]>;
@@ -32,6 +32,48 @@ const defaultLayouts: Record<Scenario, TacticLayout> = {
 function isCustomEntry(value: TacticEntry | undefined): value is CustomTactic { return Boolean(value && "layout" in value); }
 function cloneLayout(layout: TacticLayout): TacticLayout { return { positions: Object.fromEntries(Object.entries(layout.positions).map(([id, point]) => [id, { ...point }])), ball: { ...layout.ball }, annotations: (layout.annotations ?? []).map((item) => ({ ...item, from: { ...item.from }, to: { ...item.to } })) }; }
 function blankLayout(): TacticLayout { return { positions: Object.fromEntries(Object.entries(basePositions).map(([id, point]) => [id, { ...point }])), ball: { x: 50, y: 50 }, annotations: [] }; }
+
+function useAccessibleModal(active: boolean, onClose: () => void) {
+  const modalRef = useRef<HTMLElement | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const frame = window.requestAnimationFrame(() => {
+      const firstFocusable = modalRef.current?.querySelector<HTMLElement>("button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])");
+      firstFocusable?.focus();
+    });
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !modalRef.current) return;
+      const focusable = [...modalRef.current.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])")];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", onKeyDown);
+      previousFocusRef.current?.focus();
+    };
+  }, [active, onClose]);
+
+  return modalRef;
+}
+
 function templateLayout(template: TacticTemplate): TacticLayout { return template === "blank" ? blankLayout() : cloneLayout(defaultLayouts[template]); }
 function completeLayout(value: TacticLayout | undefined, scenario: TacticTemplate): TacticLayout {
   const fallback = templateLayout(scenario);
@@ -51,6 +93,7 @@ export default function TacticsBoard({ lineupId, eventTitle, tactics, onSave, on
   const [layout, setLayout] = useState(() => completeLayout(activeCustom?.layout ?? (activeEntry as TacticLayout | undefined), activeTemplate));
   const [dragging, setDragging] = useState<DragTarget | null>(null); const [saving, setSaving] = useState(false); const [message, setMessage] = useState(""); const [presenting, setPresenting] = useState(false); const [tool, setTool] = useState<"select" | AnnotationType>("select"); const [drawStart, setDrawStart] = useState<Point | null>(null);
   const [dialog, setDialog] = useState<"create" | "rename" | null>(null); const [draftName, setDraftName] = useState(""); const [draftTemplate, setDraftTemplate] = useState<TacticTemplate>("attack");
+  const closeDialog = useCallback(() => setDialog(null), []); const dialogRef = useAccessibleModal(Boolean(dialog), closeDialog);
   const boardRef = useRef<HTMLDivElement>(null); const layoutRef = useRef(layout);
 
   useEffect(() => {
@@ -78,13 +121,13 @@ export default function TacticsBoard({ lineupId, eventTitle, tactics, onSave, on
   function moveByKeyboard(event: KeyboardEvent<HTMLButtonElement>, target: DragTarget) { const delta = event.shiftKey ? 3 : 1; const point = target.kind === "ball" ? layoutRef.current.ball : layoutRef.current.positions[target.id]; if (!point) return; const next = { ...point }; if (event.key === "ArrowLeft") next.x -= delta; else if (event.key === "ArrowRight") next.x += delta; else if (event.key === "ArrowUp") next.y -= delta; else if (event.key === "ArrowDown") next.y += delta; else return; event.preventDefault(); moveTarget(target, { x: Math.min(94, Math.max(6, next.x)), y: Math.min(94, Math.max(6, next.y)) }); void persist(layoutRef.current); }
   async function resetScenario() { const next = templateLayout(activeTemplate); updateLayout(next); await persist(next); }
   async function clearAnnotations() { const next = { ...layoutRef.current, annotations: [] }; updateLayout(next); await persist(next); }
-  async function submitDialog(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const name = draftName.trim().replace(/\s+/g, " ").slice(0, 40); if (!name) return; if (dialog === "rename" && activeCustom) { await onRename(activeCustom.id, name); setDialog(null); return; } if (dialog === "create") { if (customEntries.some((entry) => entry.name.localeCompare(name, "de", { sensitivity: "base" }) === 0)) { setMessage("Dieser Taktikname ist bereits vergeben."); return; } const id = await onCreate(name, draftTemplate, templateLayout(draftTemplate)); setScenario(id); setDialog(null); } }
+  async function submitDialog(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const name = draftName.trim().replace(/\s+/g, " ").slice(0, 40); if (!name) return; if (dialog === "rename" && activeCustom) { await onRename(activeCustom.id, name); closeDialog(); return; } if (dialog === "create") { if (customEntries.some((entry) => entry.name.localeCompare(name, "de", { sensitivity: "base" }) === 0)) { setMessage("Dieser Taktikname ist bereits vergeben."); return; } const id = await onCreate(name, draftTemplate, templateLayout(draftTemplate)); setScenario(id); closeDialog(); } }
   async function duplicate() { if (!activeCustom) return; const id = await onDuplicate(activeCustom.id, cloneLayout(layoutRef.current)); setScenario(id); }
   async function remove() { if (!activeCustom || !window.confirm(`„${activeCustom.name}“ wirklich löschen?`)) return; await onDelete(activeCustom.id); setScenario("attack"); }
 
   return <div className={`tactics-workspace${presenting ? " presenting" : ""}`}>
     <div className="tactics-toolbar"><div><p className="section-index">TAKTIKTAFEL</p><strong>{lineupSource}</strong></div><div className="tactics-actions">{activeCustom && <><button className="text-button" type="button" onClick={() => { setDraftName(activeCustom.name); setDialog("rename"); }}>Umbenennen</button><button className="text-button" type="button" onClick={() => void duplicate()}>Duplizieren</button><button className="text-button danger" type="button" onClick={() => void remove()}>Löschen</button></>}<button className="text-button" type="button" onClick={() => void resetScenario()}>Zurücksetzen</button><button className="primary-button" type="button" onClick={() => setPresenting((current) => !current)}>{presenting ? "Präsentation beenden" : "Präsentieren"}</button></div></div>
-    <div className="tactics-scenarios" role="tablist" aria-label="Taktik auswählen">{(Object.keys(scenarioLabels) as Scenario[]).map((item) => <button key={item} type="button" role="tab" aria-selected={scenario === item} className={scenario === item ? "active" : ""} onClick={() => setScenario(item)}>{scenarioLabels[item]}</button>)}{customEntries.map((entry) => <button key={entry.id} type="button" role="tab" aria-selected={scenario === entry.id} className={scenario === entry.id ? "active custom" : "custom"} onClick={() => setScenario(entry.id)}>{entry.name}</button>)}<button className="tactics-add" type="button" onClick={() => { setDraftName(""); setDraftTemplate("attack"); setDialog("create"); }}>+ Neue Taktik</button><span className={saving ? "saving active" : "saving"} aria-live="polite">{saving ? "Speichert …" : "Gespeichert"}</span></div>
+    <div className="tactics-scenarios" aria-label="Taktik auswählen">{(Object.keys(scenarioLabels) as Scenario[]).map((item) => <button key={item} type="button" aria-pressed={scenario === item} className={scenario === item ? "active" : ""} onClick={() => setScenario(item)}>{scenarioLabels[item]}</button>)}{customEntries.map((entry) => <button key={entry.id} type="button" aria-pressed={scenario === entry.id} className={scenario === entry.id ? "active custom" : "custom"} onClick={() => setScenario(entry.id)}>{entry.name}</button>)}<button className="tactics-add" type="button" onClick={() => { setDraftName(""); setDraftTemplate("attack"); setDialog("create"); }}>+ Neue Taktik</button><span className={saving ? "saving active" : "saving"} aria-live="polite">{saving ? "Speichert …" : "Gespeichert"}</span></div>
     <div className="tactics-drawing-toolbar" role="toolbar" aria-label="Taktik zeichnen"><span>Zeichnen:</span>{([{ key: "select", label: "Auswahl" }, { key: "pass", label: "Pass" }, { key: "run", label: "Laufweg" }, { key: "dribble", label: "Dribbling" }, { key: "shot", label: "Torschuss" }] as const).map((item) => <button key={item.key} type="button" aria-pressed={tool === item.key} className={`drawing-tool drawing-tool-${item.key}${tool === item.key ? " active" : ""}`} onClick={() => { setTool(item.key); setDrawStart(null); }}>{item.label}</button>)}<button type="button" className="clear-drawing" onClick={() => void clearAnnotations()} disabled={!layout.annotations?.length}>Zeichnungen löschen</button></div>
     {message && <p className="coach-notice" role="status">{message}</p>}
     <div className="tactics-pitch pitch-wrap" ref={boardRef} aria-label={`${activeCustom?.name ?? scenarioLabels[scenario as Scenario] ?? "Taktik"} – taktische Positionen`}>
@@ -93,6 +136,6 @@ export default function TacticsBoard({ lineupId, eventTitle, tactics, onSave, on
       {positions.map((position) => { const player = activePlayers[position.id]; const point = layout.positions[position.id] ?? basePositions[position.id]; return <button className={`position-node has-players tactic-position${dragging?.kind === "position" && dragging.id === position.id ? " dragging" : ""}`} key={position.id} type="button" style={{ left: `${point.x}%`, top: `${point.y}%` }} aria-label={`${position.label}${player ? `: ${player.firstName}` : ": nicht besetzt"}. Verschieben`} onPointerDown={(event) => beginDrag(event, { kind: "position", id: position.id })} onPointerMove={moveDrag} onPointerUp={(event) => void finishDrag(event)} onPointerCancel={(event) => void finishDrag(event)} onKeyDown={(event) => moveByKeyboard(event, { kind: "position", id: position.id })}><span className="position-badge">{position.short}</span><span className="position-names">{player ? <span className="position-player"><PlayerAvatar firstName={player.firstName} /><strong>{player.firstName}</strong></span> : <em>Nicht besetzt</em>}</span></button>; })}
       <button className={`tactics-ball${dragging?.kind === "ball" ? " dragging" : ""}`} type="button" style={{ left: `${layout.ball.x}%`, top: `${layout.ball.y}%` }} aria-label="Ball verschieben" onPointerDown={(event) => beginDrag(event, { kind: "ball" })} onPointerMove={moveDrag} onPointerUp={(event) => void finishDrag(event)} onPointerCancel={(event) => void finishDrag(event)} onKeyDown={(event) => moveByKeyboard(event, { kind: "ball" })}>⚽</button>
     </div><p className="tactics-help">Positionen und Ball verschieben. Zeichenmodus wählen, dann auf dem Feld ziehen. Wege werden automatisch gespeichert.</p>
-    {dialog && <div className="modal-backdrop" role="presentation"><div className="coach-modal tactics-dialog" role="dialog" aria-modal="true" aria-labelledby="tactics-dialog-title"><p className="section-index">TAKTIKEN</p><h2 id="tactics-dialog-title">{dialog === "create" ? "Neue Taktik" : "Taktik umbenennen"}</h2><form onSubmit={(event) => void submitDialog(event)}><label htmlFor="tactic-name">Name</label><input id="tactic-name" value={draftName} onChange={(event) => setDraftName(event.target.value)} maxLength={40} autoFocus required />{dialog === "create" && <label htmlFor="tactic-template">Vorlage<select id="tactic-template" value={draftTemplate} onChange={(event) => setDraftTemplate(event.target.value as TacticTemplate)}><option value="attack">Angriff</option><option value="defense">Verteidigung</option><option value="corner">Ecke</option><option value="blank">Leeres Feld</option></select></label>}<div className="modal-actions"><button className="text-button" type="button" onClick={() => setDialog(null)}>Abbrechen</button><button className="primary-button" type="submit">{dialog === "create" ? "Anlegen" : "Speichern"}</button></div></form></div></div>}
+    {dialog && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDialog(); }}><div ref={dialogRef} className="coach-modal tactics-dialog" role="dialog" aria-modal="true" aria-labelledby="tactics-dialog-title"><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={closeDialog}>×</button><p className="section-index">TAKTIKEN</p><h2 id="tactics-dialog-title">{dialog === "create" ? "Neue Taktik" : "Taktik umbenennen"}</h2><form onSubmit={(event) => void submitDialog(event)}><label htmlFor="tactic-name">Name</label><input id="tactic-name" value={draftName} onChange={(event) => setDraftName(event.target.value)} maxLength={40} autoFocus required />{dialog === "create" && <label htmlFor="tactic-template">Vorlage<select id="tactic-template" value={draftTemplate} onChange={(event) => setDraftTemplate(event.target.value as TacticTemplate)}><option value="attack">Angriff</option><option value="defense">Verteidigung</option><option value="corner">Ecke</option><option value="blank">Leeres Feld</option></select></label>}<div className="modal-actions"><button className="text-button" type="button" onClick={closeDialog}>Abbrechen</button><button className="primary-button" type="submit">{dialog === "create" ? "Anlegen" : "Speichern"}</button></div></form></div></div>}
   </div>;
 }
