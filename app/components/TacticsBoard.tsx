@@ -36,6 +36,7 @@ function blankLayout(): TacticLayout { return { positions: Object.fromEntries(Ob
 function useAccessibleModal(active: boolean, onClose: () => void) {
   const modalRef = useRef<HTMLElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const setModalRef = useCallback((node: HTMLElement | null) => { modalRef.current = node; }, []);
 
   useEffect(() => {
     if (!active) return;
@@ -71,7 +72,7 @@ function useAccessibleModal(active: boolean, onClose: () => void) {
     };
   }, [active, onClose]);
 
-  return modalRef;
+  return setModalRef;
 }
 
 function templateLayout(template: TacticTemplate): TacticLayout { return template === "blank" ? blankLayout() : cloneLayout(defaultLayouts[template]); }
