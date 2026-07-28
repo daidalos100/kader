@@ -78,6 +78,48 @@ type SaveOperation = { scope: string; key: string; value: unknown; expectedRevis
 type HistoryEntry = { id: number; scope: string; record_key: string; revision: number; changed_at: string; changed_by: string };
 
 const positionOptions = ["TW", "IV", "LV", "RV", "ZDM", "ZM", "LF", "RF", "ST"];
+
+function useAccessibleModal(onClose: () => void) {
+  const modalRef = useRef<HTMLElement | null>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const frame = window.requestAnimationFrame(() => {
+      const firstFocusable = modalRef.current?.querySelector<HTMLElement>("button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])");
+      firstFocusable?.focus();
+    });
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !modalRef.current) return;
+      const focusable = [...modalRef.current.querySelectorAll<HTMLElement>("button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])")];
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", onKeyDown);
+      previousFocusRef.current?.focus();
+    };
+  }, [onClose]);
+
+  return modalRef;
+}
+
+
 const trainerQuotes = [
   { text: "Ich habe dreimal erlebt, wie erfolgreicher Fußball eine Stadt verändern kann.", author: "Jürgen Klopp (DFB, 2026)" },
   { text: "Zuerst braucht es Empathie für den Spieler, für den Menschen. Man muss verstehen, was er fühlt, welche Emotionen ihn bewegen und wie er denkt.", author: "Joachim Löw (DFB, 2024)" },
@@ -1088,7 +1130,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
           {tab === "stats" && (
             <section className="coach-view">
               <div className="view-heading compact"><div><p className="section-index">SPIELE &amp; ENTWICKLUNG</p><h1>Statistik.</h1><p>Trainings- und Einsatzquoten folgen den erfassten Teilnahmen. Tore und Assists werden pro Spieltag summiert.</p></div></div>
-              <div className="stats-table-wrap"><StatsTable rows={statsRows} totalMatches={totalMatches} awardsByPlayer={awardsByPlayer} /></div>
+              <div className="stats-table-wrap"><p className="stats-scroll-hint" id="stats-scroll-hint">Seitlich wischen für weitere Werte</p><StatsTable rows={statsRows} totalMatches={totalMatches} awardsByPlayer={awardsByPlayer} /></div>
               <StatsAwardLegend />
             </section>
           )}
@@ -1216,12 +1258,8 @@ function AttendancePanel({ event, profiles, attendance, reasons, onSet, onAll, o
 }
 
 function CalendarEventDialog({ event, onClose, onSubmit }: { event: CalendarEvent; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
-  useEffect(() => {
-    const onKeyDown = (keyEvent: KeyboardEvent) => { if (keyEvent.key === "Escape") onClose(); };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(mouseEvent) => { if (mouseEvent.target === mouseEvent.currentTarget) onClose(); }}><div className="coach-modal calendar-event-dialog" role="dialog" aria-modal="true" aria-labelledby="calendar-event-title"><button className="close-dialog" type="button" aria-label="Schließen" onClick={onClose}>×</button><p className="section-index">KALENDER · COACHING TOOL</p><h2 id="calendar-event-title">Termin bearbeiten</h2><p className="calendar-edit-note">Änderungen gelten im Coaching Tool. Der öffentliche Google-Kalender bleibt unverändert.</p><form onSubmit={onSubmit}><label>Titel<input name="title" defaultValue={event.title} maxLength={120} required /></label><div className="form-grid"><label>Beginn<input name="start" type="datetime-local" defaultValue={localDateTimeValue(event.start)} required /></label><label>Ende<input name="end" type="datetime-local" defaultValue={localDateTimeValue(event.end)} required /></label></div><div className="form-grid"><label>Art<select name="type" defaultValue={event.type}><option value="training">Training</option><option value="game">Spiel</option><option value="tournament">Turnier</option><option value="other">Termin</option></select></label><label>Ort<input name="location" defaultValue={event.location} maxLength={160} /></label></div><label>Notiz<textarea name="description" defaultValue={event.description} maxLength={1000} /></label><div className="modal-actions"><button className="text-button" type="button" onClick={onClose}>Abbrechen</button><button className="primary-button" type="submit">Termin speichern</button></div></form></div></div>;
+  const dialogRef = useAccessibleModal(onClose);
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(mouseEvent) => { if (mouseEvent.target === mouseEvent.currentTarget) onClose(); }}><div ref={dialogRef} className="coach-modal calendar-event-dialog" role="dialog" aria-modal="true" aria-labelledby="calendar-event-title"><button className="close-dialog" type="button" aria-label="Schließen" onClick={onClose}>×</button><p className="section-index">KALENDER · COACHING TOOL</p><h2 id="calendar-event-title">Termin bearbeiten</h2><p className="calendar-edit-note">Änderungen gelten im Coaching Tool. Der öffentliche Google-Kalender bleibt unverändert.</p><form onSubmit={onSubmit}><label>Titel<input name="title" defaultValue={event.title} maxLength={120} required /></label><div className="form-grid"><label>Beginn<input name="start" type="datetime-local" defaultValue={localDateTimeValue(event.start)} required /></label><label>Ende<input name="end" type="datetime-local" defaultValue={localDateTimeValue(event.end)} required /></label></div><div className="form-grid"><label>Art<select name="type" defaultValue={event.type}><option value="training">Training</option><option value="game">Spiel</option><option value="tournament">Turnier</option><option value="other">Termin</option></select></label><label>Ort<input name="location" defaultValue={event.location} maxLength={160} /></label></div><label>Notiz<textarea name="description" defaultValue={event.description} maxLength={1000} /></label><div className="modal-actions"><button className="text-button" type="button" onClick={onClose}>Abbrechen</button><button className="primary-button" type="submit">Termin speichern</button></div></form></div></div>;
 }
 
 function seasonStatus(key: SeasonStatKey, value: number | null): "good" | "average" | "critical" | "neutral" {
@@ -1309,12 +1347,8 @@ function DiagnosticMetricRow({ label, metric, unit, previous, lowerIsBetter, bes
 }
 
 function DiagnosticDetailsDialog({ profile, history, bestDisciplineKeys, onClose }: { profile: Profile; history: Diagnostic[]; bestDisciplineKeys: Set<DiagnosticDisciplineKey>; onClose: () => void }) {
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
-  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="diagnostic-details-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="coach-modal diagnostic-details-dialog"><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">LEISTUNGSDIAGNOSTIK</p><h2 id="diagnostic-details-title">{profile.firstName}</h2>{history.length ? <div className="diagnostic-detail-list">{history.map((diagnostic, index) => <DiagnosticDetailRecord key={diagnostic.id} diagnostic={diagnostic} previous={history[index + 1]} bestDisciplineKeys={index === 0 ? bestDisciplineKeys : new Set()} />)}</div> : <p className="history-empty">Noch keine Leistungsdiagnostik erfasst.</p>}</section></div>;
+  const dialogRef = useAccessibleModal(onClose);
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section ref={dialogRef} className="coach-modal diagnostic-details-dialog" role="dialog" aria-modal="true" aria-labelledby="diagnostic-details-title"><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">LEISTUNGSDIAGNOSTIK</p><h2 id="diagnostic-details-title">{profile.firstName}</h2>{history.length ? <div className="diagnostic-detail-list">{history.map((diagnostic, index) => <DiagnosticDetailRecord key={diagnostic.id} diagnostic={diagnostic} previous={history[index + 1]} bestDisciplineKeys={index === 0 ? bestDisciplineKeys : new Set()} />)}</div> : <p className="history-empty">Noch keine Leistungsdiagnostik erfasst.</p>}</section></div>;
 }
 
 function DiagnosticDetailRecord({ diagnostic, previous, bestDisciplineKeys }: { diagnostic: Diagnostic; previous?: Diagnostic; bestDisciplineKeys: Set<DiagnosticDisciplineKey> }) {
@@ -1363,7 +1397,7 @@ function StatsTable({ rows, totalMatches, awardsByPlayer }: { rows: Array<{ play
     return result === 0 ? left.player.firstName.localeCompare(right.player.firstName, "de") : sortDirection === "asc" ? result : -result;
   });
   const header = (key: StatSortKey, label: string) => <th aria-sort={sortKey === key ? sortDirection === "asc" ? "ascending" : "descending" : "none"}><button type="button" className={`stats-sort-button${sortKey === key ? " active" : ""}`} onClick={() => changeSort(key)}>{label}<span aria-hidden="true">{sortKey === key ? sortDirection === "asc" ? "↑" : "↓" : "↕"}</span></button></th>;
-  return <><table className="stats-table"><thead><tr>{header("player", "Spieler:in")}{header("training", "Training")}{header("appearances", "Einsätze")}{header("goals", "Tore")}{header("assists", "Assists")}{header("award", "Award")}</tr></thead><tbody>{sortedRows.map((row) => {
+  return <><table className="stats-table" aria-describedby="stats-scroll-hint"><thead><tr>{header("player", "Spieler:in")}{header("training", "Training")}{header("appearances", "Einsätze")}{header("goals", "Tore")}{header("assists", "Assists")}{header("award", "Award")}</tr></thead><tbody>{sortedRows.map((row) => {
     const appearanceRate = appearanceRateFor(row);
     const trainingStatus = rateStatus(row.participation);
     const appearanceStatus = rateStatus(appearanceRate);
@@ -1397,12 +1431,8 @@ function StatsAwardLegend() {
 }
 
 function StatDetailsDialog({ player, label, value, events, onClose }: { player: Profile; label: string; value: string; events: StatEventDetail[]; onClose: () => void }) {
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
-  return <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="stat-details-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="coach-modal stat-details-dialog"><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">STATISTIK · DETAILS</p><h2 id="stat-details-title">{player.firstName} · {label}</h2><strong className="stat-details-value">{value}</strong>{events.length ? <ul>{events.map((event) => <li key={`${event.eventId}-${event.detail}`}><time>{event.date}</time><div><strong>{event.title}</strong><span>{event.detail}</span></div></li>)}</ul> : <p className="history-empty">Noch keine Einträge vorhanden.</p>}<div className="modal-actions"><button className="primary-button" type="button" onClick={onClose}>Schließen</button></div></section></div>;
+  const dialogRef = useAccessibleModal(onClose);
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section ref={dialogRef} className="coach-modal stat-details-dialog" role="dialog" aria-modal="true" aria-labelledby="stat-details-title"><button className="close-dialog" type="button" aria-label="Dialog schließen" onClick={onClose}>×</button><p className="section-index">STATISTIK · DETAILS</p><h2 id="stat-details-title">{player.firstName} · {label}</h2><strong className="stat-details-value">{value}</strong>{events.length ? <ul>{events.map((event) => <li key={`${event.eventId}-${event.detail}`}><time>{event.date}</time><div><strong>{event.title}</strong><span>{event.detail}</span></div></li>)}</ul> : <p className="history-empty">Noch keine Einträge vorhanden.</p>}<div className="modal-actions"><button className="primary-button" type="button" onClick={onClose}>Schließen</button></div></section></div>;
 }
 
 function MatchdayPanel({ event, events, lineup, profiles, data, onChooseEvent, onGoal, onUndo, onResult, onRestoreGoalEvents }: { event: CalendarEvent | null; events: CalendarEvent[]; lineup: MatchdayLineupPlayer[]; profiles: Profile[]; data: MatchData | null; onChooseEvent: (event: CalendarEvent) => void; onGoal: (eventId: string, scorerId: string, assistId: string | null) => Promise<boolean>; onUndo: (eventId: string, goal: GoalEvent) => Promise<boolean>; onResult: (result: string) => void; onRestoreGoalEvents: (eventId: string) => Promise<boolean> }) {
