@@ -118,7 +118,7 @@ function useAccessibleModal(onClose: () => void) {
       document.removeEventListener("keydown", onKeyDown);
       previousFocusRef.current?.focus();
     };
-  }, [onClose]);
+  }, []);
 
   return modalRef;
 }
