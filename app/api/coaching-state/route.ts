@@ -5,7 +5,12 @@ import { getSupabaseConfig, supabaseHeaders } from "../../lib/supabase";
 
 const SEASON_ID = "d1-2026-27";
 const attendanceStatuses = new Set(["present", "excused", "absent", "not_selected"]);
-const absenceReasons = new Set(["Krankheit", "Verletzung", "Privat", "Schul-Event"]);
+const absenceReasons = new Set(["Krankheit/Verletzung", "Krankheit", "Verletzung", "Privat", "Schul-Event"]);
+
+function normalizeAbsenceReason(value: unknown) {
+  const reason = String(value);
+  return reason === "Krankheit" || reason === "Verletzung" ? "Krankheit/Verletzung" : reason;
+}
 const allowedScopes = new Set(["roster", "profile", "attendance", "match_meta", "match_entry", "diagnostic", "tactic", "calendar_event"]);
 
 type RecordRow = {
@@ -65,7 +70,7 @@ function assembleState(rows: RecordRow[]) {
         state.attendance[eventId][playerId] = status;
         if (record?.reason && absenceReasons.has(String(record.reason))) {
           state.attendanceReasons[eventId] ??= {};
-          state.attendanceReasons[eventId][playerId] = record.reason;
+          state.attendanceReasons[eventId][playerId] = normalizeAbsenceReason(record.reason);
         }
       }
     }
