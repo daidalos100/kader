@@ -82,6 +82,7 @@ const positionOptions = ["TW", "IV", "LV", "RV", "ZDM", "ZM", "LF", "RF", "ST"];
 function useAccessibleModal(onClose: () => void) {
   const modalRef = useRef<HTMLElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const setModalRef = useCallback((node: HTMLElement | null) => { modalRef.current = node; }, []);
 
   useEffect(() => {
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
