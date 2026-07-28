@@ -394,6 +394,15 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .view-heading.compact { min-height: 0; }
 .view-heading h1 { max-width: 900px; margin: 9px 0 10px; font-size: clamp(3rem, 8vw, 7.6rem); line-height: .82; letter-spacing: -.065em; text-transform: uppercase; }
 .view-heading.compact h1 { font-size: clamp(3rem, 6.5vw, 6.2rem); }
+/* Die Startseiten-Headline bleibt auf Desktop bewusst einzeilig; mobil darf sie umbrechen. */
+@media (min-width: 821px) {
+  .view-heading:not(.compact) h1 {
+    max-width: none;
+    white-space: nowrap;
+    font-size: clamp(3.25rem, 5.2vw, 6rem);
+    letter-spacing: -.055em;
+  }
+}
 .view-heading p:last-child { max-width: 690px; margin: 0; color: #aaa; line-height: 1.6; }
 .overview-quote { width: min(100%, 1080px); max-width: 100% !important; margin-top: 14px; color: #d9d9db !important; font-size: clamp(.78rem, 1.05vw, .96rem); font-style: italic; line-height: 1.42 !important; overflow-wrap: anywhere; animation: overview-quote-reveal .85s cubic-bezier(.2,.8,.2,1) both; }
 .overview-quote > span { display: inline; }
