@@ -8,7 +8,8 @@ import type { CalendarEvent } from "../lib/calendar";
 
 type Tab = "overview" | "calendar" | "lineup" | "matchday" | "tactics" | "players" | "stats";
 type AttendanceStatus = "present" | "excused" | "absent" | "not_selected";
-type AbsenceReason = "Krankheit" | "Verletzung" | "Privat" | "Schul-Event";
+type AbsenceReason = "Krankheit/Verletzung" | "Privat" | "Schul-Event";
+type StoredAbsenceReason = AbsenceReason | "Krankheit" | "Verletzung";
 type Profile = {
   id: string;
   firstName: string;
@@ -67,7 +68,7 @@ type CoachingState = {
   roster: string[];
   profiles: Record<string, Partial<Profile>>;
   attendance: Record<string, Record<string, AttendanceStatus>>;
-  attendanceReasons: Record<string, Record<string, AbsenceReason>>;
+  attendanceReasons: Record<string, Record<string, StoredAbsenceReason>>;
   matches: Record<string, MatchData>;
   diagnostics: Record<string, Diagnostic[]>;
   tactics: Record<string, TacticEntry>;
@@ -105,6 +106,10 @@ const calendarVisibleFrom = new Date("2026-07-07T00:00:00+02:00").getTime();
 // nicht erst mit dem ersten Turnier. So zählen auch Testspiele ab 07.07. mit.
 const seasonStart = calendarVisibleFrom;
 const emptyState: CoachingState = { roster: [], profiles: {}, attendance: {}, attendanceReasons: {}, matches: {}, diagnostics: {}, tactics: {}, calendarOverrides: {} };
+function displayAbsenceReason(reason: StoredAbsenceReason | undefined) {
+  return reason === "Krankheit" || reason === "Verletzung" ? "Krankheit/Verletzung" : reason;
+}
+
 function playerId(name: string) {
   return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "-");
 }
@@ -609,7 +614,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
       profiles.forEach((player) => {
         const status = state.attendance[event.id]?.[player.id];
         const reason = status === "excused" ? state.attendanceReasons[event.id]?.[player.id] : undefined;
-        const detail = status === "present" ? "Anwesend" : status === "excused" ? `Entschuldigt${reason ? ` (${reason})` : ""}` : status === "not_selected" ? "Nicht im Kader" : status === "absent" ? "Abwesend" : "Noch nicht erfasst";
+        const detail = status === "present" ? "Anwesend" : status === "excused" ? `Entschuldigt${reason ? ` (${displayAbsenceReason(reason)})` : ""}` : status === "not_selected" ? "Nicht im Kader" : status === "absent" ? "Abwesend" : "Noch nicht erfasst";
         (appearances[player.id] ??= []).push({ eventId: event.id, title: event.title, date: formatDate(event.start, false), detail });
       });
     });
@@ -628,7 +633,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
         recorded += 1;
         if (status === "present") present += 1;
       }
-      return { eventId: event.id, title: event.title, date: formatDate(event.start, false), detail: status === "present" ? "Anwesend" : status === "excused" ? `Entschuldigt${reason ? ` (${reason})` : ""}` : status === "not_selected" ? "Nicht im Kader" : status === "absent" ? "Abwesend" : "Noch nicht erfasst" };
+      return { eventId: event.id, title: event.title, date: formatDate(event.start, false), detail: status === "present" ? "Anwesend" : status === "excused" ? `Entschuldigt${reason ? ` (${displayAbsenceReason(reason)})` : ""}` : status === "not_selected" ? "Nicht im Kader" : status === "absent" ? "Abwesend" : "Noch nicht erfasst" };
     });
     Object.entries(state.matches).forEach(([eventId, match]) => {
       const entry = match.entries[player.id];
@@ -1202,12 +1207,12 @@ function EventCard({ event, active, anchor, onOpen }: { event: CalendarEvent; ac
   return <article id={anchor ? "next-calendar-event" : undefined} className={`event-card type-${event.type}${active ? " active" : ""}${anchor ? " calendar-next-anchor" : ""}`}><div className="event-card-top"><span>{anchor ? "Nächster Termin" : eventLabel(event.type)}</span><time>{formatDate(event.start)}</time></div><h3>{event.title}</h3><p>{event.location || "Ort noch offen"}</p><div className="event-card-actions">{hasLineup && <button type="button" className="primary-action" onClick={() => onOpen(event, "lineup")}>Kader planen →</button>}<button type="button" onClick={() => onOpen(event, "attendance")}>Teilnahme eintragen →</button></div></article>;
 }
 
-function AttendancePanel({ event, profiles, attendance, reasons, onSet, onAll, onEdit }: { event: CalendarEvent; profiles: Profile[]; attendance: Record<string, AttendanceStatus>; reasons: Record<string, AbsenceReason>; onSet: (eventId: string, id: string, status: AttendanceStatus, reason?: AbsenceReason) => void; onAll: (eventId: string) => void; onEdit: () => void }) {
+function AttendancePanel({ event, profiles, attendance, reasons, onSet, onAll, onEdit }: { event: CalendarEvent; profiles: Profile[]; attendance: Record<string, AttendanceStatus>; reasons: Record<string, StoredAbsenceReason>; onSet: (eventId: string, id: string, status: AttendanceStatus, reason?: AbsenceReason) => void; onAll: (eventId: string) => void; onEdit: () => void }) {
   const [reasonPlayer, setReasonPlayer] = useState<string | null>(null);
-  const absenceReasons: AbsenceReason[] = ["Krankheit", "Verletzung", "Privat", "Schul-Event"];
+  const absenceReasons: AbsenceReason[] = ["Krankheit/Verletzung", "Privat", "Schul-Event"];
   const statuses = (event.type === "game" || event.type === "tournament" ? ["present", "excused", "absent", "not_selected"] : ["present", "excused", "absent"]) as AttendanceStatus[];
   const labels: Record<AttendanceStatus, string> = { present: "Anwesend", excused: "Entschuldigt", absent: "Abwesend", not_selected: "Nicht im Kader" };
-  return <><div className="detail-head"><div><p className="section-index">TEILNAHME</p><h2>{event.title}</h2><p>{formatDate(event.start)}</p></div><div className="detail-actions"><button className="text-button" type="button" onClick={onEdit}>Termin bearbeiten</button><button className="text-button" onClick={() => onAll(event.id)}>Alle anwesend</button></div></div><div className="attendance-list">{profiles.map((player) => <div className="attendance-row" key={player.id}><div><Image src={`/api/player-image?name=${encodeURIComponent(player.firstName)}`} alt="" width={38} height={38} unoptimized /><strong>{player.firstName}</strong>{attendance[player.id] === "excused" && reasons[player.id] && <small className="attendance-reason">{reasons[player.id]}</small>}</div><div className="attendance-options">{statuses.map((status) => <button key={status} className={`${status}${attendance[player.id] === status ? " selected" : ""}`} onClick={() => status === "excused" ? setReasonPlayer(player.id) : onSet(event.id, player.id, status)} aria-label={`${player.firstName}: ${labels[status].toLocaleLowerCase("de-DE")}`}><span />{labels[status]}</button>)}{reasonPlayer === player.id && <select className="attendance-reason-select" aria-label={`${player.firstName}: Grund auswählen`} value={reasons[player.id] ?? ""} onChange={(event) => { const reason = event.target.value as AbsenceReason; if (reason) { onSet(event.currentTarget.name || "", player.id, "excused", reason); setReasonPlayer(null); } }} name={event.id}><option value="">Grund wählen</option>{absenceReasons.map((reason) => <option key={reason} value={reason}>{reason}</option>)}</select>}</div></div>)}</div></>;
+  return <><div className="detail-head"><div><p className="section-index">TEILNAHME</p><h2>{event.title}</h2><p>{formatDate(event.start)}</p></div><div className="detail-actions"><button className="text-button" type="button" onClick={onEdit}>Termin bearbeiten</button><button className="text-button" onClick={() => onAll(event.id)}>Alle anwesend</button></div></div><div className="attendance-list">{profiles.map((player) => <div className="attendance-row" key={player.id}><div><Image src={`/api/player-image?name=${encodeURIComponent(player.firstName)}`} alt="" width={38} height={38} unoptimized /><strong>{player.firstName}</strong>{attendance[player.id] === "excused" && reasons[player.id] && <small className="attendance-reason">{displayAbsenceReason(reasons[player.id])}</small>}</div><div className="attendance-options">{statuses.map((status) => <button key={status} className={`${status}${attendance[player.id] === status ? " selected" : ""}`} onClick={() => status === "excused" ? setReasonPlayer(player.id) : onSet(event.id, player.id, status)} aria-label={`${player.firstName}: ${labels[status].toLocaleLowerCase("de-DE")}`}><span />{labels[status]}</button>)}{reasonPlayer === player.id && <select className="attendance-reason-select" aria-label={`${player.firstName}: Grund auswählen`} value={displayAbsenceReason(reasons[player.id]) ?? ""} onChange={(event) => { const reason = event.target.value as AbsenceReason; if (reason) { onSet(event.currentTarget.name || "", player.id, "excused", reason); setReasonPlayer(null); } }} name={event.id}><option value="">Grund wählen</option>{absenceReasons.map((reason) => <option key={reason} value={reason}>{reason}</option>)}</select>}</div></div>)}</div></>;
 }
 
 function CalendarEventDialog({ event, onClose, onSubmit }: { event: CalendarEvent; onClose: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
