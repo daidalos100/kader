@@ -21,7 +21,20 @@ body {
     radial-gradient(circle at 80% -10%, rgba(239, 22, 28, 0.13), transparent 28rem),
     var(--black);
   color: var(--white);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-onest), Arial, Helvetica, sans-serif;
+}
+
+/* Days One is reserved for short, high-impact page titles. Everything else
+   intentionally stays in Onest for dense coaching data and small screens. */
+.view-heading h1,
+.matchday-heading h1,
+.login-card h1 {
+  font-family: var(--font-days-one), var(--font-onest), sans-serif;
+  font-weight: 400;
+  letter-spacing: .01em;
+  line-height: .98;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 
 button, input { font: inherit; }
@@ -192,7 +205,7 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .player-list { position: relative; z-index: 2; display: grid; gap: 8px; margin: 0 0 22px; padding: 0; list-style: none; }
 .player-row { display: grid; grid-template-columns: 30px 38px 44px 1fr auto; align-items: center; min-height: 58px; padding: 8px 10px; border: 1px solid rgba(244,243,239,.14); background: #18191e; touch-action: none; }
 .player-row.is-dragging { z-index: 5; border-color: var(--red); box-shadow: 0 15px 40px rgba(0,0,0,.45); }
-.player-rank { color: #676970; font-family: var(--font-geist-mono), monospace; font-size: .7rem; }
+.player-rank { color: #676970; font-family: var(--font-onest), Arial, Helvetica, sans-serif; font-size: .7rem; }
 .player-row strong { font-size: 1rem; }
 .drag-handle { display: grid; gap: 3px; padding: 8px 6px; border: 0; background: transparent; cursor: grab; }
 .drag-handle span { display: block; width: 15px; height: 1px; background: #8c8e94; }
