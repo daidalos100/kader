@@ -120,7 +120,7 @@ function useAccessibleModal(onClose: () => void) {
     };
   }, []);
 
-  return modalRef;
+  return setModalRef;
 }
 
 
