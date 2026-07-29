@@ -1,129 +1,92 @@
 # TSG Tübingen D1 · Coaching Tool
 
-Traineroberfläche für Kalender, terminbezogene Kaderplanung, Trainingsanwesenheit,
-Spielstatistik, Spielerprofile und Leistungsdiagnostik. Der öffentliche D1-Google-
-Kalender wird automatisch gelesen; geschützte Daten werden serverseitig in Supabase
-gespeichert.
+Geschützte Traineranwendung für Kalender, Teilnahme, Kaderplanung, Spieltag,
+Taktik, Teamprofile, Leistungsdiagnostik, Statistik und Änderungsverlauf.
 
-## Einmalige Supabase-Einrichtung für Phase 2
+Produktion: [kader02.vercel.app](https://kader02.vercel.app/)
 
-Die Datei `supabase/phase2.sql` einmal im SQL Editor des bestehenden Supabase-Projekts
-ausführen. Sie ergänzt ausschließlich die Phase-2-Tabelle und verändert weder die
-vorhandene Aufstellung noch die Spielerbilder.
+## Technischer Stand
 
-Erforderliche Laufzeitvariablen:
+- Next.js 16, React 19, TypeScript strict
+- Vercel als produktive Hosting-Plattform
+- Supabase PostgreSQL/REST und Auth
+- öffentlicher Google-Kalender als derzeitige externe Terminquelle
+- Node.js 22
+- Regressionstests mit `node:test`
 
-- `EDIT_PIN`
-- `SUPABASE_URL`
-- `SUPABASE_SECRET_KEY`
+Das Repository enthält noch Vinext-/Cloudflare-Starterbestandteile. Diese sind nicht
+der maßgebliche Produktionspfad. Für eine Vercel-nahe Prüfung immer
+`npm run build:vercel` verwenden.
 
-Die Werte dürfen nur in der Hosting-Umgebung liegen und gehören nicht ins Repository.
+## Lokale Entwicklung in VS Code
 
-## Technische Basis
+Voraussetzungen: Git, Node.js 22 und npm.
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
-
-## Prerequisites
-
-- Node.js `>=22.13.0`
-- Linux with `flock`, `curl`, and GNU `timeout`
-
-## Sites Lifecycle
-
-The Sites lifecycle CLI runs the locked dependency install before returning this checkout. Edit the source under `app/`, then checkpoint when a coherent milestone is ready to inspect or share. The remote Sites builder runs `npm run build` against the pushed commit. Do not repeat install or build as a normal pre-checkpoint step.
-
-This starter does not use `wrangler.jsonc`.
-
-`install:ci` is intentionally a single, non-retrying `npm ci`. It refuses a concurrent install for the same project, consumes a matching image-seeded npm cache with `--prefer-offline` while retaining registry fallback for a missing cache object, otherwise downloads and verifies the complete vinext tarball recorded in `package-lock.json`, limits npm to one socket, and terminates a stalled install. `build` applies a short timeout and then validates the Sites artifact. These helpers target Linux and use GNU `timeout`; they are not native macOS scripts.
-
-Scripts that need writable project-scoped home, npm, XDG, and temporary paths use `scripts/sites-env.sh`. The `dev` and `start` scripts honor the caller's runtime environment and keep Wrangler logs inside the checkout. The generated `.sites-runtime/` directory is disposable and ignored by Git.
-
-## Included Shape
-
-- edit site code under `app/`
-- `app/chatgpt-auth.ts` provides optional dispatch-owned ChatGPT sign-in helpers
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/index.ts` reads the D1 binding from the Cloudflare Worker environment
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```bash
+git clone https://github.com/daidalos100/kader.git
+cd kader
+npm ci
+cp .env.example .env.local
+npm run dev
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+Die Werte in `.env.local` müssen aus der jeweiligen Entwicklungsumgebung stammen.
+Keine Zugangsdaten in Git committen.
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+Empfohlene Prüfungen vor einem Push:
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+```bash
+npm run lint
+npm run test:regression
+npm run build:vercel
+```
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
+`npm test` führt zusätzlich den historischen Vinext/Sites-Build aus und benötigt
+Linux mit GNU `timeout`. Für die produktive Vercel-Auslieferung ist
+`npm run build:vercel` maßgeblich.
 
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
+## Umgebungsvariablen
 
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+Siehe `.env.example`. Benötigt werden abhängig von der Umgebung:
 
-## Diagnostic Commands
+- `SUPABASE_URL`
+- `SUPABASE_SECRET_KEY`
+- `SUPABASE_PUBLISHABLE_KEY` (optional)
+- `TRAINER_ACCESS_JSON`
+- `TRAINER_SESSION_SECRET`
+- `EDIT_PIN` (nur Legacy-Fallback)
 
-- `npm run install:ci`: perform the one bounded lockfile install
-- `npm run dev`: start the Vite/Vinext development server
-- `npm run build`: build and validate the deployable Sites artifact
-- `npm run start`: start the built Vinext application
-- `npm test`: build, validate, and verify the rendered development-preview metadata
-- `npm run validate:artifact`: recheck an existing artifact's manifest and ESM `default.fetch` export
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+`SUPABASE_SECRET_KEY` ist ausschließlich serverseitig und darf nie mit
+`NEXT_PUBLIC_` veröffentlicht werden.
 
-Use build and validation commands for targeted diagnosis after a remote failure, not as part of the normal checkpoint path.
+## Wichtige Bereiche
 
-The timeout defaults can be overridden for a controlled canary with `SITES_INSTALL_TIMEOUT`, `SITES_INSTALL_KILL_AFTER`, `SITES_BUILD_TIMEOUT`, and `SITES_BUILD_KILL_AFTER`. A timeout fails the command; the helpers never retry an unchanged install or build.
+- `app/components/CoachingTool.tsx` – historisch gewachsene Hauptoberfläche
+- `app/components/TacticsBoard.tsx` – Taktiktafel
+- `app/api/` – geschützte Server-Endpunkte
+- `app/auth.ts` – Trainer-Sitzungen und Zugriff
+- `app/lib/calendar.ts` – Kalenderintegration
+- `supabase/` – Datenbankskripte
+- `tests/hardening.test.mjs` – Regressionen, Sicherheit und UX-Schutz
+- `AGENTS.md` – verbindliche Codex-Arbeitsregeln
+- `PROJECT_HANDOFF.md` – aktueller technischer Übergabestand
+- `docs/TRAINING_MODULE_IMPLEMENTATION_PLAN.md` – Architektur des geplanten Trainingsmoduls
 
-## Learn More
+## Trainingsmodul und Plattformausbau
 
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+Das Konzept für das neue Trainingsmodul ist fachlich weit entwickelt. Vor der
+Implementierung werden Mandantenfähigkeit, Rollen, UUID-basierte Spieleridentitäten,
+interne Termin-IDs, RLS und das neue Domänenmodell als Architektur-Sprint umgesetzt.
+Die Details und offenen Entscheidungen stehen im Implementierungsplan.
+
+## Deployment
+
+Vercel baut den Branch `main` mit:
+
+```bash
+npm run build:vercel
+```
+
+Produktionsvariablen werden ausschließlich in Vercel und Supabase verwaltet.
+Datenbankänderungen müssen als versionierte SQL-Migration im Repository
+nachvollziehbar sein und zuerst in einer nichtproduktiven Umgebung geprüft werden.
