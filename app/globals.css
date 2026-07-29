@@ -564,6 +564,8 @@ footer { display: flex; align-items: center; gap: 18px; padding-top: 22px; color
 .season-history-overview article header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .season-history-overview article header b { color: #f2f1ee; font-size: .68rem; font-weight: 900; }
 .season-history-overview article header span { color: #888a90; font-size: .49rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.season-history-awards { display: flex; align-items: center; gap: 4px; margin: -1px 0 0; }
+.season-history-awards span { font-size: .82rem; line-height: 1; }
 .season-history-overview article > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
 .season-history-overview article > div > span { display: grid; gap: 3px; min-width: 0; }
 .season-history-overview small { overflow: hidden; color: #888a90; font-size: .47rem; font-weight: 800; letter-spacing: .04em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
