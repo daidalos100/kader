@@ -82,10 +82,27 @@ const positionOptions = ["TW", "IV", "LV", "RV", "ZDM", "ZM", "LF", "RF", "ST"];
 
 // Abgeschlossene Saison 2025/26 (D2): historische Auszeichnungen, bewusst getrennt von der laufenden D1-Statistik.
 const historicSeasonAwards: Record<string, HistoricSeasonAward[]> = {
-  "2025-26:juls": [{ emoji: "🏆", title: "Champions Trophy · Saisonwertung aus Abschlussspielen und Mini-Turnieren der Trainingseinheiten" }, { emoji: "🥉", title: "Trainingsbeteiligung · 3. Platz der gesamten Saison" }],
-  "2025-26:emil": [{ emoji: "🥇", title: "Trainingsbeteiligung · 1. Platz der gesamten Saison" }],
-  "2025-26:nebaray": [{ emoji: "🥈", title: "Trainingsbeteiligung · 2. Platz der gesamten Saison" }],
+  juls: [{ emoji: "🏆", title: "Champions Trophy · Saisonwertung aus Abschlussspielen und Mini-Turnieren der Trainingseinheiten" }, { emoji: "🥉", title: "Trainingsbeteiligung · 3. Platz der gesamten Saison" }],
+  emil: [{ emoji: "🥇", title: "Trainingsbeteiligung · 1. Platz der gesamten Saison" }],
+  nebaray: [{ emoji: "🥈", title: "Trainingsbeteiligung · 2. Platz der gesamten Saison" }],
 };
+
+function isSeason2025_26(record: Pick<PlayerSeasonHistory, "seasonId" | "seasonLabel">) {
+  const value = `${record.seasonId} ${record.seasonLabel}`;
+  return /2025/.test(value) && /26/.test(value);
+}
+
+function historicAwardsForSeason(record: PlayerSeasonHistory) {
+  return isSeason2025_26(record) ? historicSeasonAwards[record.playerId] ?? [] : [];
+}
+
+function historicStatAwardsForPlayer(playerId: string): StatAward[] {
+  return (historicSeasonAwards[playerId] ?? []).map((award) => ({
+    kind: award.emoji === "🏆" ? "scorer-hero" : "training-leader",
+    label: award.emoji,
+    title: `${award.title} · Saison 2025/26`,
+  }));
+}
 
 function useAccessibleModal(onClose: () => void) {
   const modalRef = useRef<HTMLElement | null>(null);
@@ -1132,6 +1149,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
                     ...(bestStats.has("goals") ? [{ kind: "goals-leader" as const, label: "⚽", title: "Die meisten Tore" }] : []),
                     ...(bestStats.has("assists") ? [{ kind: "assists-leader" as const, label: "🎯", title: "Die meisten Assists" }] : []),
                     ...(awardsByPlayer[player.id] ?? []),
+                    ...historicStatAwardsForPlayer(player.id),
                   ].sort((left, right) => Number(left.kind === "dream-duo") - Number(right.kind === "dream-duo"));
                   return <StaticPlayerCard key={player.id} profile={player} appearanceRate={appearanceRate} goals={goals} assists={assists} participation={participation} bestSeasonStatKeys={bestStats} history={history} awards={cardAwards} bestDisciplineKeys={diagnosticBestByPlayer[player.id] ?? new Set()} onEdit={() => setEditingProfile(player)} onDetails={() => setDetailPlayer(player)} />;
                 })}
@@ -1142,7 +1160,7 @@ export default function CoachingTool({ trainerName, trainerCanCorrectHistory }: 
           {tab === "stats" && (
             <section className="coach-view">
               <div className="view-heading compact"><div><p className="section-index">SPIELE &amp; ENTWICKLUNG</p><h1>Statistik.</h1><p>Trainings- und Einsatzquoten folgen den erfassten Teilnahmen. Tore und Assists werden pro Spieltag summiert.</p></div></div>
-              <div className="stats-table-wrap"><p className="stats-scroll-hint" id="stats-scroll-hint">Seitlich wischen für weitere Werte</p><StatsTable rows={statsRows} totalMatches={totalMatches} awardsByPlayer={awardsByPlayer} /></div>
+              <div className="stats-table-wrap"><p className="stats-scroll-hint" id="stats-scroll-hint">Seitlich wischen für weitere Werte</p><StatsTable rows={statsRows} totalMatches={totalMatches} awardsByPlayer={Object.fromEntries(profiles.map((player) => [player.id, [...(awardsByPlayer[player.id] ?? []), ...historicStatAwardsForPlayer(player.id)]]))} /></div>
               <StatsAwardLegend />
             </section>
           )}
@@ -1299,7 +1317,7 @@ function SeasonHistoryOverview({ records }: { records: PlayerSeasonHistory[] }) 
       const training = record.trainingRatePercent === null ? "—" : `${record.trainingRatePercent}%${record.trainingPresentCount === null ? "" : ` · ${record.trainingPresentCount}×`}`;
       const appearances = record.appearanceCount === null ? "—" : `${record.appearanceCount}${record.appearanceOpportunities === null ? "" : `/${record.appearanceOpportunities}`}`;
       const scoringRate = record.goals !== null && record.appearanceCount && record.appearanceCount > 0 ? (record.goals / record.appearanceCount).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
-      const awards = historicSeasonAwards[`${record.seasonId}:${record.playerId}`] ?? [];
+      const awards = historicAwardsForSeason(record);
       return <article key={record.seasonId}>
         <header><b>{record.seasonLabel} · {record.teamLabel}</b><span>Abgeschlossen</span></header>
         {awards.length ? <p className="season-history-awards" aria-label="Auszeichnungen der Saison">{awards.map((award) => <span key={award.title} title={award.title} aria-label={award.title}>{award.emoji}</span>)}</p> : null}
