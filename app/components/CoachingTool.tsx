@@ -52,6 +52,7 @@ type StatSortKey = "player" | "appearances" | "goals" | "assists" | "training" |
 type StatEventDetail = { eventId: string; title: string; date: string; detail: string };
 type StatAwardKind = "training-leader" | "appearance-leader" | "goals-leader" | "assists-leader" | "dream-duo" | "clean-sheet" | "comeback" | "upward-trend" | "chain" | "bollwerk" | "scorer-hero";
 type StatAward = { kind: StatAwardKind; label: string; title: string };
+type HistoricSeasonAward = { emoji: string; title: string };
 type PlayerSeasonHistory = {
   playerId: string;
   seasonId: string;
@@ -78,6 +79,13 @@ type SaveOperation = { scope: string; key: string; value: unknown; expectedRevis
 type HistoryEntry = { id: number; scope: string; record_key: string; revision: number; changed_at: string; changed_by: string };
 
 const positionOptions = ["TW", "IV", "LV", "RV", "ZDM", "ZM", "LF", "RF", "ST"];
+
+// Abgeschlossene Saison 2025/26 (D2): historische Auszeichnungen, bewusst getrennt von der laufenden D1-Statistik.
+const historicSeasonAwards: Record<string, HistoricSeasonAward[]> = {
+  "2025-26:juls": [{ emoji: "🏆", title: "Champions Trophy · Saisonwertung aus Abschlussspielen und Mini-Turnieren der Trainingseinheiten" }, { emoji: "🥉", title: "Trainingsbeteiligung · 3. Platz der gesamten Saison" }],
+  "2025-26:emil": [{ emoji: "🥇", title: "Trainingsbeteiligung · 1. Platz der gesamten Saison" }],
+  "2025-26:nebaray": [{ emoji: "🥈", title: "Trainingsbeteiligung · 2. Platz der gesamten Saison" }],
+};
 
 function useAccessibleModal(onClose: () => void) {
   const modalRef = useRef<HTMLElement | null>(null);
@@ -1291,7 +1299,12 @@ function SeasonHistoryOverview({ records }: { records: PlayerSeasonHistory[] }) 
       const training = record.trainingRatePercent === null ? "—" : `${record.trainingRatePercent}%${record.trainingPresentCount === null ? "" : ` · ${record.trainingPresentCount}×`}`;
       const appearances = record.appearanceCount === null ? "—" : `${record.appearanceCount}${record.appearanceOpportunities === null ? "" : `/${record.appearanceOpportunities}`}`;
       const scoringRate = record.goals !== null && record.appearanceCount && record.appearanceCount > 0 ? (record.goals / record.appearanceCount).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
-      return <article key={record.seasonId}><header><b>{record.seasonLabel} · {record.teamLabel}</b><span>Abgeschlossen</span></header><div><span><small>Training</small><b>{training}</b></span><span><small>Einsätze</small><b>{appearances}</b></span><span><small>Tore</small><b>{record.goals ?? "—"}</b></span><span><small>Ø Tore</small><b>{scoringRate}</b></span></div></article>;
+      const awards = historicSeasonAwards[`${record.seasonId}:${record.playerId}`] ?? [];
+      return <article key={record.seasonId}>
+        <header><b>{record.seasonLabel} · {record.teamLabel}</b><span>Abgeschlossen</span></header>
+        {awards.length ? <p className="season-history-awards" aria-label="Auszeichnungen der Saison">{awards.map((award) => <span key={award.title} title={award.title} aria-label={award.title}>{award.emoji}</span>)}</p> : null}
+        <div><span><small>Training</small><b>{training}</b></span><span><small>Einsätze</small><b>{appearances}</b></span><span><small>Tore</small><b>{record.goals ?? "—"}</b></span><span><small>Ø Tore</small><b>{scoringRate}</b></span></div>
+      </article>;
     })}
   </section>;
 }
@@ -1430,6 +1443,8 @@ function StatsAwardLegend() {
     ["⛓️", "Kette", "Mindestens zwei Zu-null-Spiele in Folge in der Defensive aufgestellt."],
     ["🧱", "Bollwerk", "Wenigste Gegentore pro auswertbarem Defensiv-Einsatz."],
     ["⭐", "Scorer-Held", "Meiste Tore und Assists zusammen."],
+    ["🏆", "Champions Trophy", "Saisonwertung aus den Abschlussspielen und Mini-Turnieren der Trainingseinheiten."],
+    ["🥇🥈🥉", "Trainingsbeteiligung", "1. bis 3. Platz der gesamten Saison."],
   ] as const;
   return <section className="stats-award-legend" aria-labelledby="stats-award-legend-title"><p className="section-index">AUSZEICHNUNGEN</p><h2 id="stats-award-legend-title">Badge-Legende.</h2><div>{entries.map(([emoji, title, description]) => <article key={title}><span aria-hidden="true">{emoji}</span><p><strong>{title}</strong><small>{description}</small></p></article>)}</div></section>;
 }
